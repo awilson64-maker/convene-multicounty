@@ -1,2 +1,0 @@
-window.foo = true;
-setInterval(function(){ window.foo = true; }, 1000);
