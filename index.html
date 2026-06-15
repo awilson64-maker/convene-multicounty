@@ -23,42 +23,95 @@
   <div class="layout">
     <nav class="sidebar">
       <button class="nav-btn active" data-view="dashboardView">Dashboard</button>
-      <button class="nav-btn" data-view="crmView">Organizations</button>
-      <button class="nav-btn" data-view="mapView">Map</button>
+      <button class="nav-btn" data-view="orgView">Organizations</button>
+      <button class="nav-btn" data-view="contactView">Contacts</button>
+      <button class="nav-btn" data-view="activityView">Activities</button>
+      <button class="nav-btn" data-view="relationshipView">Relationships</button>
+      <button class="nav-btn" data-view="mapView">Ecosystem Map</button>
       <button class="nav-btn" data-view="censusView">Census Gap Lens</button>
       <button class="nav-btn" data-view="backupView">Backup / Restore</button>
-      <div class="sidebar-note">This edition keeps county settings and browser storage separated.</div>
+      <div class="sidebar-note">Multi-county edition. Each county has its own browser storage namespace.</div>
     </nav>
 
     <main>
       <section id="dashboardView" class="view active">
-        <h2>County Dashboard</h2>
+        <div class="section-header">
+          <div><h2>County Dashboard</h2><p>Quick view of the active county workspace.</p></div>
+        </div>
         <div class="grid metrics">
           <article class="card"><span class="metric" id="orgCount">0</span><span>Organizations</span></article>
-          <article class="card"><span class="metric" id="typeCount">0</span><span>Service Types</span></article>
-          <article class="card"><span class="metric" id="mappedCount">0</span><span>Mapped Assets</span></article>
-          <article class="card"><span class="metric" id="activeCountyId">-</span><span>Active County</span></article>
+          <article class="card"><span class="metric" id="contactCount">0</span><span>Contacts</span></article>
+          <article class="card"><span class="metric" id="activityCount">0</span><span>Activities</span></article>
+          <article class="card"><span class="metric" id="taskCount">0</span><span>Open Follow-ups</span></article>
         </div>
-        <div class="card">
-          <h3>County profile</h3>
-          <p id="countySummary"></p>
+        <div class="grid two-col">
+          <div class="card">
+            <h3>County profile</h3>
+            <p id="countySummary"></p>
+          </div>
+          <div class="card">
+            <h3>Upcoming follow-ups</h3>
+            <div id="taskList" class="compact-list"></div>
+          </div>
         </div>
       </section>
 
-      <section id="crmView" class="view">
+      <section id="orgView" class="view">
         <div class="section-header">
           <div><h2>Organizations</h2><p>Add, search, edit, and import county-specific organization records.</p></div>
           <button id="addOrgBtn" class="primary">Add Organization</button>
         </div>
         <div class="card filters">
-          <input id="searchBox" type="search" placeholder="Search by name, type, focus, address, notes..." />
-          <select id="typeFilter"><option value="">All types</option></select>
+          <input id="orgSearchBox" type="search" placeholder="Search by name, type, focus, address, notes..." />
+          <select id="orgTypeFilter"><option value="">All types</option></select>
         </div>
-        <div id="orgList" class="org-list"></div>
+        <div id="orgList" class="record-list"></div>
+      </section>
+
+      <section id="contactView" class="view">
+        <div class="section-header">
+          <div><h2>Contacts</h2><p>Track people connected to organizations, coalitions, and follow-ups.</p></div>
+          <button id="addContactBtn" class="primary">Add Contact</button>
+        </div>
+        <div class="card filters">
+          <input id="contactSearchBox" type="search" placeholder="Search by name, role, organization, email, notes..." />
+          <select id="contactOrgFilter"><option value="">All organizations</option></select>
+        </div>
+        <div id="contactList" class="record-list"></div>
+      </section>
+
+      <section id="activityView" class="view">
+        <div class="section-header">
+          <div><h2>Activities</h2><p>Log meetings, calls, site visits, emails, and follow-up tasks.</p></div>
+          <button id="addActivityBtn" class="primary">Add Activity</button>
+        </div>
+        <div class="card filters three-filter">
+          <input id="activitySearchBox" type="search" placeholder="Search by summary, notes, organization, contact..." />
+          <select id="activityTypeFilter"><option value="">All activity types</option></select>
+          <select id="activityTaskFilter"><option value="">All follow-up status</option><option value="open">Open follow-ups</option><option value="completed">Completed follow-ups</option></select>
+        </div>
+        <div id="activityList" class="record-list"></div>
+      </section>
+
+      <section id="relationshipView" class="view">
+        <div class="section-header">
+          <div><h2>Relationships</h2><p>Map connections, potential collaborations, and network strength.</p></div>
+          <button id="addRelationshipBtn" class="primary">Add Relationship</button>
+        </div>
+        <div class="card filters">
+          <input id="relationshipSearchBox" type="search" placeholder="Search by organization, status, strength, notes..." />
+          <select id="relationshipStatusFilter"><option value="">All statuses</option></select>
+        </div>
+        <div id="relationshipList" class="record-list"></div>
       </section>
 
       <section id="mapView" class="view">
-        <div class="section-header"><div><h2>Asset Map</h2><p>County-specific map center, boundary, and organization points.</p></div></div>
+        <div class="section-header"><div><h2>Ecosystem Map</h2><p>County-specific map center, organization points, and simple service filters.</p></div></div>
+        <div class="card map-controls">
+          <select id="mapTypeFilter"><option value="">All service types</option></select>
+          <label class="checkline"><input id="mapHeatToggle" type="checkbox" /> Heat layer</label>
+          <span id="mapStatus" class="muted"></span>
+        </div>
         <div id="map" class="map"></div>
       </section>
 
@@ -72,7 +125,7 @@
         <div class="grid two-col">
           <div class="card">
             <h3>Export county backup</h3>
-            <p>Exports only the active county's organization records.</p>
+            <p>Exports the active county workspace, including organizations, contacts, activities, and relationships.</p>
             <button id="exportBtn" class="primary">Download Backup</button>
           </div>
           <div class="card">
@@ -83,7 +136,7 @@
         </div>
         <div class="card">
           <h3>CSV import preview</h3>
-          <p>Append new records from CSV after reviewing the parsed preview.</p>
+          <p>Append new organization records from CSV after reviewing the parsed preview. This does not import contacts or activities yet.</p>
           <input id="csvFile" type="file" accept=".csv,text/csv" />
           <div id="csvPreview"></div>
         </div>
@@ -93,14 +146,14 @@
 
   <dialog id="orgDialog">
     <form method="dialog" id="orgForm">
-      <h3 id="dialogTitle">Organization</h3>
+      <h3 id="orgDialogTitle">Organization</h3>
       <input type="hidden" id="orgId" />
       <div class="form-grid">
         <label>Name<input id="name" required /></label>
         <label>Type<input id="type" placeholder="Food Security, Housing, Aging / Disability..." /></label>
-        <label>Status<select id="status"><option>Active</option><option>Research only</option><option>Inactive</option></select></label>
-        <label>Reach<select id="reach"><option>Countywide</option><option>Municipal</option><option>Neighborhood</option><option>Regional</option></select></label>
-        <label>Confidence<select id="confidence"><option>High</option><option>Medium</option><option>Low</option></select></label>
+        <label>Status<select id="status"><option>Active</option><option>Research only</option><option>Inactive</option><option>Not contacted</option><option>Met</option><option>Active collaboration</option></select></label>
+        <label>Reach<select id="reach"><option>Countywide</option><option>Municipal</option><option>Neighborhood</option><option>Regional</option><option>Unknown</option></select></label>
+        <label>Confidence<select id="confidence"><option>High</option><option>Medium</option><option>Low</option><option>Needs verification</option></select></label>
         <label>Phone<input id="phone" /></label>
         <label>Website<input id="website" /></label>
         <label>Email<input id="email" /></label>
@@ -118,7 +171,68 @@
     </form>
   </dialog>
 
+  <dialog id="contactDialog">
+    <form method="dialog" id="contactForm">
+      <h3 id="contactDialogTitle">Contact</h3>
+      <input type="hidden" id="contactId" />
+      <div class="form-grid">
+        <label>Name<input id="contactName" required /></label>
+        <label>Organization<select id="contactOrganizationId"></select></label>
+        <label>Title / Role<input id="contactRole" /></label>
+        <label>Email<input id="contactEmail" /></label>
+        <label>Phone<input id="contactPhone" /></label>
+        <label>Relationship strength<select id="contactStrength"><option></option><option>Weak</option><option>Moderate</option><option>Strong</option></select></label>
+        <label class="full">Notes<textarea id="contactNotes"></textarea></label>
+      </div>
+      <menu>
+        <button value="cancel">Cancel</button>
+        <button id="saveContactBtn" value="default" class="primary">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="activityDialog">
+    <form method="dialog" id="activityForm">
+      <h3 id="activityDialogTitle">Activity</h3>
+      <input type="hidden" id="activityId" />
+      <div class="form-grid">
+        <label>Date<input id="activityDate" type="date" /></label>
+        <label>Type<select id="activityType"><option>Email</option><option>Phone call</option><option>Meeting</option><option>Site visit</option><option>Event</option><option>Intro</option><option>Follow-up</option></select></label>
+        <label class="full">Organizations<select id="activityOrganizationIds" multiple size="5"></select></label>
+        <label class="full">Contacts<select id="activityContactIds" multiple size="5"></select></label>
+        <label class="full">Summary<input id="activitySummary" required /></label>
+        <label>Follow-up date<input id="activityFollowUpDate" type="date" /></label>
+        <label class="checkline"><input id="activityFollowUpCompleted" type="checkbox" /> Follow-up completed</label>
+        <label class="full">Notes<textarea id="activityNotes"></textarea></label>
+      </div>
+      <menu>
+        <button value="cancel">Cancel</button>
+        <button id="saveActivityBtn" value="default" class="primary">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="relationshipDialog">
+    <form method="dialog" id="relationshipForm">
+      <h3 id="relationshipDialogTitle">Relationship</h3>
+      <input type="hidden" id="relationshipId" />
+      <div class="form-grid">
+        <label>Organization A<select id="relationshipFromOrgId"></select></label>
+        <label>Organization B<select id="relationshipToOrgId"></select></label>
+        <label>Strength<select id="relationshipStrength"><option>Weak</option><option>Moderate</option><option>Strong</option></select></label>
+        <label>Status<select id="relationshipStatus"><option>Potential</option><option>Active</option><option>Historic</option></select></label>
+        <label class="full">Summary<input id="relationshipSummary" /></label>
+        <label class="full">Notes<textarea id="relationshipNotes"></textarea></label>
+      </div>
+      <menu>
+        <button value="cancel">Cancel</button>
+        <button id="saveRelationshipBtn" value="default" class="primary">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <script src="js/county-config.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/access.js"></script>
