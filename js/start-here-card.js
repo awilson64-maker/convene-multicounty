@@ -13,12 +13,20 @@
     insertCard();
     document.addEventListener('click', handleStartHereClick);
     var countySelect = document.getElementById('countySelect');
-    if (countySelect) countySelect.addEventListener('change', function () { setTimeout(updateCountyName, 150); });
+    if (countySelect) countySelect.addEventListener('change', function () {
+      setTimeout(function () {
+        insertCard();
+        updateCountyName();
+      }, 150);
+    });
     setTimeout(updateCountyName, 250);
   }
 
   function insertCard() {
-    if (document.getElementById('startHereCard')) return;
+    var existing = document.getElementById('startHereCard');
+    if (existing) existing.remove();
+    if (isHiddenForCounty()) return;
+
     var dashboard = document.getElementById('dashboardView');
     if (!dashboard) return;
 
@@ -31,7 +39,10 @@
           '<h3>Start Here</h3>' +
           '<p class="muted">Use this workspace to build, map, and report on the active county community ecosystem.</p>' +
         '</div>' +
-        '<span id="startHereCounty" class="start-here-county">Active county</span>' +
+        '<div class="start-here-top-actions">' +
+          '<span id="startHereCounty" class="start-here-county">Active county</span>' +
+          '<button type="button" id="hideStartHereBtn" class="start-here-hide">Hide this guide</button>' +
+        '</div>' +
       '</div>' +
       '<div class="start-here-steps">' +
         '<div><b>1</b><span>Add or import organizations.</span></div>' +
@@ -51,9 +62,18 @@
     var header = dashboard.querySelector('.section-header');
     if (header && header.nextSibling) dashboard.insertBefore(card, header.nextSibling);
     else dashboard.insertBefore(card, dashboard.firstChild);
+    updateCountyName();
   }
 
   function handleStartHereClick(event) {
+    var hideButton = event.target.closest('#hideStartHereBtn');
+    if (hideButton) {
+      hideForCounty();
+      var card = document.getElementById('startHereCard');
+      if (card) card.remove();
+      return;
+    }
+
     var button = event.target.closest('[data-start-view]');
     if (!button) return;
     var viewId = button.getAttribute('data-start-view');
@@ -69,6 +89,31 @@
     label.textContent = selectedOption && selectedOption.text ? selectedOption.text : 'Active county';
   }
 
+  function currentCountyId() {
+    var countySelect = document.getElementById('countySelect');
+    return countySelect && countySelect.value ? countySelect.value : (window.CONVENE_DEFAULT_COUNTY || 'default');
+  }
+
+  function storageKey() {
+    return 'convene:startHere:hidden:' + currentCountyId();
+  }
+
+  function isHiddenForCounty() {
+    try {
+      return localStorage.getItem(storageKey()) === 'true';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function hideForCounty() {
+    try {
+      localStorage.setItem(storageKey(), 'true');
+    } catch (error) {
+      // If storage is unavailable, remove it for this session only.
+    }
+  }
+
   function installStyles() {
     if (document.getElementById('startHereStyles')) return;
     var style = document.createElement('style');
@@ -78,7 +123,10 @@
       '.start-here-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }' +
       '.start-here-header h3 { margin: 0 0 4px; }' +
       '.start-here-header p { margin: 0; }' +
+      '.start-here-top-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }' +
       '.start-here-county { background: #f3f4f6; border-radius: 999px; padding: 5px 10px; font-weight: 800; font-size: .8rem; white-space: nowrap; }' +
+      '.start-here-hide { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 10px; cursor: pointer; font-weight: 700; color: var(--muted); font-size: .8rem; }' +
+      '.start-here-hide:hover { background: #fff5f5; color: var(--brand); border-color: rgba(197, 5, 12, .35); }' +
       '.start-here-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin: 12px 0; }' +
       '.start-here-steps div { display: flex; gap: 9px; align-items: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: #fff; }' +
       '.start-here-steps b { background: var(--brand); color: #fff; min-width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: .78rem; }' +
