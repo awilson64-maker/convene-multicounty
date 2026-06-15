@@ -1,29 +1,54 @@
 window.ConveneStorage = (() => {
+  const STORES = ['organizations', 'contacts', 'activities', 'relationships'];
+
   function key(county, name) {
     return `${county.storagePrefix}:${name}`;
   }
 
-  function loadOrgs(county) {
+  function loadStore(county, name) {
     try {
-      return JSON.parse(localStorage.getItem(key(county, 'organizations')) || '[]');
+      return JSON.parse(localStorage.getItem(key(county, name)) || '[]');
     } catch (err) {
-      console.warn('Could not read organizations from storage', err);
+      console.warn(`Could not read ${name} from storage`, err);
       return [];
     }
   }
 
-  function saveOrgs(county, orgs) {
-    localStorage.setItem(key(county, 'organizations'), JSON.stringify(orgs));
+  function saveStore(county, name, records) {
+    localStorage.setItem(key(county, name), JSON.stringify(records || []));
   }
 
-  function exportBackup(county, orgs) {
+  function loadWorkspace(county) {
+    const workspace = {};
+    STORES.forEach(store => { workspace[store] = loadStore(county, store); });
+    return workspace;
+  }
+
+  function saveWorkspace(county, workspace) {
+    STORES.forEach(store => saveStore(county, store, workspace[store] || []));
+  }
+
+  function exportBackup(county, workspace) {
     return {
       system: 'CONVENE',
       edition: 'multi-county',
       countyId: county.id,
       countyName: county.name,
       exportDate: new Date().toISOString(),
-      organizations: orgs
+      stores: STORES,
+      organizations: workspace.organizations || [],
+      contacts: workspace.contacts || [],
+      activities: workspace.activities || [],
+      relationships: workspace.relationships || []
+    };
+  }
+
+  function workspaceFromBackup(data) {
+    return {
+      organizations: Array.isArray(data.organizations) ? data.organizations : [],
+      contacts: Array.isArray(data.contacts) ? data.contacts : [],
+      activities: Array.isArray(data.activities) ? data.activities : [],
+      relationships: Array.isArray(data.relationships) ? data.relationships : []
     };
   }
 
@@ -39,5 +64,5 @@ window.ConveneStorage = (() => {
     URL.revokeObjectURL(url);
   }
 
-  return { key, loadOrgs, saveOrgs, exportBackup, downloadJson };
+  return { STORES, key, loadStore, saveStore, loadWorkspace, saveWorkspace, exportBackup, workspaceFromBackup, downloadJson };
 })();
