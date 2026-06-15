@@ -1,0 +1,149 @@
+#conveneSplash {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255,255,255,.98) 0%, rgba(255,255,255,.95) 42%, rgba(244,244,244,.96) 100%);
+  transition: opacity .45s ease, visibility .45s ease;
+}
+#conveneSplash::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, rgba(197,5,12,.045), transparent 34%, rgba(40,39,40,.035)),
+    radial-gradient(circle at 50% 46%, rgba(197,5,12,.06), transparent 24%);
+  pointer-events: none;
+}
+#conveneSplash.splash-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+.convene-splash-card {
+  position: relative;
+  width: min(780px, calc(100vw - 44px));
+  text-align: center;
+  padding: 32px 24px;
+}
+.convene-splash-mark {
+  position: relative;
+  width: 260px;
+  height: 170px;
+  margin: 0 auto 18px;
+}
+.convene-splash-wi {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 132px;
+  height: 118px;
+  transform: translateX(-50%);
+  opacity: .24;
+}
+.convene-splash-wi svg,
+.convene-splash-network svg { width: 100%; height: 100%; display: block; }
+.convene-splash-network {
+  position: absolute;
+  left: 50%;
+  top: 34px;
+  width: 158px;
+  height: 92px;
+  transform: translateX(-50%);
+  opacity: .72;
+}
+.convene-splash-person {
+  position: absolute;
+  width: 92px;
+  height: 92px;
+  border-radius: 999px 999px 24px 999px;
+  top: 58px;
+  transform: rotate(-28deg);
+  background: #111;
+}
+.convene-splash-person::before {
+  content: '';
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  top: -34px;
+  left: 28px;
+  background: inherit;
+}
+.convene-splash-person.left { left: 18px; }
+.convene-splash-person.right { right: 18px; transform: scaleX(-1) rotate(-28deg); background: #c5050c; }
+.convene-splash-person.center {
+  left: 50%;
+  top: 68px;
+  width: 70px;
+  height: 88px;
+  transform: translateX(-50%);
+  border-radius: 999px 999px 52px 52px;
+  background: #c5050c;
+  z-index: 2;
+}
+.convene-splash-person.center::before {
+  width: 54px;
+  height: 54px;
+  left: 8px;
+  top: -46px;
+  background: #d80a14;
+}
+.convene-splash-orbit {
+  position: absolute;
+  left: 50%;
+  top: 62px;
+  width: 240px;
+  height: 84px;
+  transform: translateX(-50%);
+  border: 12px solid rgba(197,5,12,.9);
+  border-top-color: transparent;
+  border-left-color: rgba(40,39,40,.86);
+  border-radius: 50%;
+  opacity: .95;
+}
+.convene-splash-title {
+  margin: 0;
+  font-size: clamp(52px, 9vw, 92px);
+  line-height: .9;
+  letter-spacing: .04em;
+  font-weight: 900;
+}
+.convene-splash-title .black { color: #111; }
+.convene-splash-title .gray { color: #9ca3af; }
+.convene-splash-title .red { color: #c5050c; }
+.convene-splash-subtitle {
+  margin: 18px auto 0;
+  max-width: 780px;
+  font-size: clamp(18px, 2.5vw, 28px);
+  line-height: 1.28;
+  font-weight: 700;
+  color: #1f2937;
+}
+.convene-splash-loading {
+  margin-top: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #646569;
+  font-weight: 700;
+}
+.convene-splash-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(197,5,12,.18);
+  border-top-color: #c5050c;
+  animation: conveneSpin .9s linear infinite;
+}
+@keyframes conveneSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #conveneSplash { transition: none; }
+  .convene-splash-spinner { animation: none; }
+}
+@media (max-width: 640px) {
+  .convene-splash-mark { transform: scale(.78); margin-bottom: 0; }
+  .convene-splash-subtitle { font-size: 17px; }
+}
