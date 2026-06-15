@@ -7,6 +7,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     installBackButton();
     installNavigationTracker();
+    loadFocusTagHelper();
     updateBackButton();
   });
 
@@ -52,6 +53,15 @@
       .topbar-actions { gap: 10px; align-items: center; }
     `;
     document.head.appendChild(style);
+  }
+
+  function loadFocusTagHelper() {
+    if (document.querySelector('script[data-convene-focus-tags]') || window.__conveneOrgFocusTagsLoaded) return;
+    const script = document.createElement('script');
+    script.src = 'js/org-focus-tags.js';
+    script.defer = true;
+    script.dataset.conveneFocusTags = 'true';
+    document.body.appendChild(script);
   }
 
   function installNavigationTracker() {
