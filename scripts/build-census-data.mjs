@@ -6,8 +6,8 @@ const COUNTIES = {
   waupaca: { id: 'waupaca', name: 'Waupaca County', state: '55', county: '135', out: 'data/waupaca/census-tracts.json' }
 };
 
-const ACS_YEAR = process.env.ACS_YEAR || '2024';
-const ACS_CHUNK_SIZE = 35;
+const REQUESTED_ACS_YEAR = process.env.ACS_YEAR || '2023';
+const ACS_CHUNK_SIZE = 24;
 
 const CORE_VARS = ['NAME'];
 const DATA_VARS = [
@@ -70,28 +70,58 @@ async function main() {
   if (!selected.length) throw new Error(`Unknown county choice: ${choice}`);
 
   for (const county of selected) {
-    console.log(`Building ${county.name} with ACS ${ACS_YEAR}...`);
-    const acsRows = await fetchAcs(county);
-    console.log(`Fetched ACS rows: ${acsRows.length}`);
+    console.log(`Building ${county.name}; requested ACS ${REQUESTED_ACS_YEAR}...`);
+    const { rows: acsRows, year: acsYear } = await fetchAcsWithFallback(county);
+    console.log(`Fetched ACS rows: ${acsRows.length} from ACS ${acsYear}`);
     const tracts = await fetchTracts(county);
     console.log(`Fetched tract geometries: ${tracts.features?.length || 0}`);
-    const payload = buildPayload(county, acsRows, tracts);
+    const payload = buildPayload(county, acsRows, tracts, acsYear);
     await fs.mkdir(path.dirname(county.out), { recursive: true });
     await fs.writeFile(county.out, JSON.stringify(payload));
     console.log(`Wrote ${county.out} with ${payload.geojson.features.length} tracts.`);
   }
 }
 
-async function fetchAcs(county) {
+async function fetchAcsWithFallback(county) {
+  const years = fallbackYears(REQUESTED_ACS_YEAR);
+  const errors = [];
+
+  for (const year of years) {
+    try {
+      const rows = await fetchAcs(county, year);
+      return { rows, year };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`ACS ${year}: ${message}`);
+      console.warn(`ACS ${year} failed for ${county.name}. Trying next available year if possible.`);
+    }
+  }
+
+  throw new Error(`Could not fetch ACS data for ${county.name}. Attempts:\n${errors.join('\n\n')}`);
+}
+
+function fallbackYears(requestedYear) {
+  const requested = Number(requestedYear);
+  const candidates = Number.isFinite(requested)
+    ? [requested, requested - 1, requested - 2]
+    : [2023, 2022, 2021];
+  return [...new Set(candidates.filter(year => year >= 2019).map(String))];
+}
+
+async function fetchAcs(county, year) {
   const mergedByGeoid = new Map();
   const chunks = chunk(DATA_VARS, ACS_CHUNK_SIZE);
 
   for (let index = 0; index < chunks.length; index += 1) {
     const get = [...CORE_VARS, ...chunks[index]].join(',');
-    const url = `https://api.census.gov/data/${ACS_YEAR}/acs/acs5?get=${encodeURIComponent(get)}&for=tract:*&in=state:${county.state}%20county:${county.county}`;
-    console.log(`Fetching ACS chunk ${index + 1}/${chunks.length} for ${county.name}...`);
-    const json = await fetchJson(url);
+    const url = `https://api.census.gov/data/${year}/acs/acs5?get=${get}&for=tract:*&in=state:${county.state}%20county:${county.county}`;
+    console.log(`Fetching ACS ${year} chunk ${index + 1}/${chunks.length} for ${county.name}...`);
+    const json = await fetchJson(url, `ACS ${year} chunk ${index + 1} for ${county.name}`);
     const [header, ...rows] = json;
+
+    if (!Array.isArray(header) || !header.includes('state') || !header.includes('county') || !header.includes('tract')) {
+      throw new Error(`Unexpected ACS response header for ${county.name} in ${year}.`);
+    }
 
     for (const row of rows) {
       const record = Object.fromEntries(header.map((key, columnIndex) => [key, row[columnIndex]]));
@@ -101,28 +131,38 @@ async function fetchAcs(county) {
     }
   }
 
-  return [...mergedByGeoid.values()];
+  const rows = [...mergedByGeoid.values()];
+  if (!rows.length) throw new Error(`ACS returned zero tract rows for ${county.name} in ${year}.`);
+  return rows;
 }
 
 async function fetchTracts(county) {
   const where = encodeURIComponent(`STATE='${county.state}' AND COUNTY='${county.county}'`);
   const outFields = encodeURIComponent('GEOID,STATE,COUNTY,TRACT,NAME');
   const url = `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/8/query?where=${where}&outFields=${outFields}&outSR=4326&f=geojson`;
-  const json = await fetchJson(url);
+  const json = await fetchJson(url, `TIGERweb tracts for ${county.name}`);
   if (!json.features?.length) throw new Error(`No TIGERweb tract features returned for ${county.name}.`);
   return json;
 }
 
-async function fetchJson(url) {
+async function fetchJson(url, label) {
   const response = await fetch(url, { headers: { 'User-Agent': 'CONVENE census builder' } });
+  const contentType = response.headers.get('content-type') || '';
+  const text = await response.text();
+
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Fetch failed ${response.status}: ${url}\n${text.slice(0, 500)}`);
+    throw new Error(`${label} failed with HTTP ${response.status}. URL: ${url}\n${text.slice(0, 700)}`);
   }
-  return response.json();
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const snippet = text.replace(/\s+/g, ' ').slice(0, 700);
+    throw new Error(`${label} returned non-JSON content. Content-Type: ${contentType || 'unknown'}. URL: ${url}\n${snippet}`);
+  }
 }
 
-function buildPayload(county, rows, tractGeojson) {
+function buildPayload(county, rows, tractGeojson, acsYear) {
   const acsByGeoid = new Map();
   for (const row of rows) {
     const geoid = `${row.state}${row.county}${row.tract}`;
@@ -148,7 +188,8 @@ function buildPayload(county, rows, tractGeojson) {
 
   return {
     source: 'U.S. Census Bureau ACS 5-year and TIGERweb',
-    acsYear: ACS_YEAR,
+    requestedAcsYear: REQUESTED_ACS_YEAR,
+    acsYear,
     state: county.state,
     county: county.county,
     countyId: county.id,
@@ -232,7 +273,7 @@ function num(value) {
 }
 
 function average(values) {
-  return values.reduce((total, value) => value + total, 0) / values.length;
+  return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 function chunk(values, size) {
