@@ -7,9 +7,10 @@ const COUNTIES = {
 };
 
 const ACS_YEAR = process.env.ACS_YEAR || '2024';
+const ACS_CHUNK_SIZE = 35;
 
-const VARS = [
-  'NAME',
+const CORE_VARS = ['NAME'];
+const DATA_VARS = [
   'B01001_001E',
   'B01001_003E', 'B01001_004E', 'B01001_005E', 'B01001_006E',
   'B01001_020E', 'B01001_021E', 'B01001_022E', 'B01001_023E', 'B01001_024E', 'B01001_025E',
@@ -69,9 +70,11 @@ async function main() {
   if (!selected.length) throw new Error(`Unknown county choice: ${choice}`);
 
   for (const county of selected) {
-    console.log(`Building ${county.name}...`);
+    console.log(`Building ${county.name} with ACS ${ACS_YEAR}...`);
     const acsRows = await fetchAcs(county);
+    console.log(`Fetched ACS rows: ${acsRows.length}`);
     const tracts = await fetchTracts(county);
+    console.log(`Fetched tract geometries: ${tracts.features?.length || 0}`);
     const payload = buildPayload(county, acsRows, tracts);
     await fs.mkdir(path.dirname(county.out), { recursive: true });
     await fs.writeFile(county.out, JSON.stringify(payload));
@@ -80,11 +83,25 @@ async function main() {
 }
 
 async function fetchAcs(county) {
-  const get = VARS.join(',');
-  const url = `https://api.census.gov/data/${ACS_YEAR}/acs/acs5?get=${encodeURIComponent(get)}&for=tract:*&in=state:${county.state}%20county:${county.county}`;
-  const json = await fetchJson(url);
-  const [header, ...rows] = json;
-  return rows.map(row => Object.fromEntries(header.map((key, index) => [key, row[index]])));
+  const mergedByGeoid = new Map();
+  const chunks = chunk(DATA_VARS, ACS_CHUNK_SIZE);
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    const get = [...CORE_VARS, ...chunks[index]].join(',');
+    const url = `https://api.census.gov/data/${ACS_YEAR}/acs/acs5?get=${encodeURIComponent(get)}&for=tract:*&in=state:${county.state}%20county:${county.county}`;
+    console.log(`Fetching ACS chunk ${index + 1}/${chunks.length} for ${county.name}...`);
+    const json = await fetchJson(url);
+    const [header, ...rows] = json;
+
+    for (const row of rows) {
+      const record = Object.fromEntries(header.map((key, columnIndex) => [key, row[columnIndex]]));
+      const geoid = `${record.state}${record.county}${record.tract}`;
+      const existing = mergedByGeoid.get(geoid) || {};
+      mergedByGeoid.set(geoid, { ...existing, ...record });
+    }
+  }
+
+  return [...mergedByGeoid.values()];
 }
 
 async function fetchTracts(county) {
@@ -171,7 +188,9 @@ function addCompositeMetrics(records) {
   const ranges = {};
   for (const metric of DIRECT_METRICS) {
     const values = records.map(record => record[metric]).filter(Number.isFinite);
-    ranges[metric] = { min: Math.min(...values), max: Math.max(...values) };
+    ranges[metric] = values.length
+      ? { min: Math.min(...values), max: Math.max(...values) }
+      : { min: null, max: null };
   }
 
   for (const record of records) {
@@ -213,7 +232,15 @@ function num(value) {
 }
 
 function average(values) {
-  return values.reduce((total, value) => total + value, 0) / values.length;
+  return values.reduce((total, value) => value + total, 0) / values.length;
+}
+
+function chunk(values, size) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
 }
 
 main().catch(error => {
