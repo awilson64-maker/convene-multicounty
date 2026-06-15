@@ -56,22 +56,23 @@
     document.head.appendChild(style);
   }
 
-  function loadFocusTagHelper() {
-    if (document.querySelector('script[data-convene-focus-tags]') || window.__conveneOrgFocusTagsLoaded) return;
+  function loadScriptOnce(src, attr, flagName) {
+    if (document.querySelector(`script[${attr}]`) || (flagName && window[flagName])) return;
     const script = document.createElement('script');
-    script.src = 'js/org-focus-tags.js';
+    script.src = src;
     script.defer = true;
-    script.dataset.conveneFocusTags = 'true';
+    script.setAttribute(attr, 'true');
     document.body.appendChild(script);
   }
 
+  function loadFocusTagHelper() {
+    loadScriptOnce('js/org-focus-tags.js', 'data-convene-focus-tags', '__conveneOrgFocusTagsLoaded');
+    loadScriptOnce('js/org-tag-clickfix.js', 'data-convene-focus-clickfix', '__conveneOrgTagClickFixLoaded');
+  }
+
   function loadReportsHelper() {
-    if (document.querySelector('script[data-convene-reports]') || window.__conveneReportsV2Loaded) return;
-    const script = document.createElement('script');
-    script.src = 'js/reports-v2.js';
-    script.defer = true;
-    script.dataset.conveneReports = 'true';
-    document.body.appendChild(script);
+    loadScriptOnce('js/reports-v2.js', 'data-convene-reports', '__conveneReportsV2Loaded');
+    loadScriptOnce('js/reports-fallback.js', 'data-convene-reports-fallback', '__conveneReportFallbackLoaded');
   }
 
   function installNavigationTracker() {
