@@ -83,7 +83,7 @@ async function main() {
     const payload = buildPayload(county, acsRows, tracts, acsYear);
     await fs.mkdir(path.dirname(county.out), { recursive: true });
     await fs.writeFile(county.out, JSON.stringify(payload));
-    console.log(`Wrote ${county.out} with ${payload.geojson.features.length} tracts.`);
+    console.log(`Wrote ${county.out} with ${payload.geojson.features.length} tracts and ${payload.matchedTracts} ACS matches.`);
   }
 }
 
@@ -147,13 +147,14 @@ async function fetchAcs(county, year) {
 }
 
 async function fetchTracts(county) {
-  const url = new URL('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/8/query');
+  // TIGERweb Tracts_Blocks layer 0 is current Census Tracts. Layer 8 is ACS 2024 Block Groups, which is too granular for tract-level ACS joins.
+  const url = new URL('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query');
   url.searchParams.set('where', `STATE='${county.state}' AND COUNTY='${county.county}'`);
-  url.searchParams.set('outFields', 'GEOID,STATE,COUNTY,TRACT,NAME');
+  url.searchParams.set('outFields', 'GEOID,STATE,COUNTY,TRACT,BASENAME,NAME');
   url.searchParams.set('outSR', '4326');
   url.searchParams.set('f', 'geojson');
 
-  const json = await fetchJson(url, `TIGERweb tracts for ${county.name}`);
+  const json = await fetchJson(url, `TIGERweb tract geometries for ${county.name}`);
   if (!json.features?.length) throw new Error(`No TIGERweb tract features returned for ${county.name}.`);
   return json;
 }
@@ -192,10 +193,12 @@ function buildPayload(county, rows, tractGeojson, acsYear) {
 
   addCompositeMetrics([...acsByGeoid.values()]);
 
+  let matchedTracts = 0;
   const features = tractGeojson.features.map(feature => {
     const props = feature.properties || {};
     const geoid = String(props.GEOID || props.geoid || `${props.STATE || county.state}${props.COUNTY || county.county}${props.TRACT || ''}`);
     const acs = acsByGeoid.get(geoid) || {};
+    if (Object.keys(acs).length) matchedTracts += 1;
     return {
       ...feature,
       id: geoid,
@@ -207,6 +210,12 @@ function buildPayload(county, rows, tractGeojson, acsYear) {
     };
   });
 
+  if (features.length && matchedTracts === 0) {
+    const sampleGeoids = features.slice(0, 5).map(feature => feature.properties?.GEOID).join(', ');
+    const sampleAcs = [...acsByGeoid.keys()].slice(0, 5).join(', ');
+    throw new Error(`TIGERweb geometry did not match ACS tract GEOIDs for ${county.name}. Geometry sample: ${sampleGeoids}. ACS sample: ${sampleAcs}.`);
+  }
+
   return {
     source: 'U.S. Census Bureau ACS 5-year and TIGERweb',
     requestedAcsYear: REQUESTED_ACS_YEAR,
@@ -216,6 +225,7 @@ function buildPayload(county, rows, tractGeojson, acsYear) {
     countyId: county.id,
     countyName: county.name,
     generatedAt: new Date().toISOString(),
+    matchedTracts,
     metrics: METADATA,
     geojson: { type: 'FeatureCollection', features }
   };
