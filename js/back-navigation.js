@@ -11,6 +11,7 @@
     loadOrgTypeHelper();
     loadFocusTagHelper();
     loadCompactListHelper();
+    loadOrgListControlsHelper();
     loadReportsHelper();
     updateBackButton();
   });
@@ -84,6 +85,10 @@
 
   function loadCompactListHelper() {
     loadScriptOnce('js/compact-list-style.js', 'data-convene-compact-list-style', '__conveneCompactListStyleLoaded');
+  }
+
+  function loadOrgListControlsHelper() {
+    loadScriptOnce('js/org-list-controls.js', 'data-convene-org-list-controls', '__conveneOrgListControlsLoaded');
   }
 
   function loadReportsHelper() {
