@@ -5,16 +5,30 @@
   const state = {
     activeTag: '',
     observerStarted: false,
-    applying: false
+    applying: false,
+    booted: false
   };
 
-  document.addEventListener('DOMContentLoaded', () => {
+  bootWhenReady();
+
+  function bootWhenReady() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot, { once: true });
+    } else {
+      boot();
+    }
+  }
+
+  function boot() {
+    if (state.booted) return;
+    state.booted = true;
     installStyles();
     installFilterBar();
     bindFilterEvents();
     observeOrgList();
-    setTimeout(refreshOrgTags, 300);
-  });
+    setTimeout(refreshOrgTags, 150);
+    setTimeout(refreshOrgTags, 550);
+  }
 
   function installStyles() {
     if (document.getElementById('conveneOrgFocusTagStyles')) return;
@@ -53,23 +67,30 @@
         align-items: center;
         flex-wrap: wrap;
         gap: 6px;
-        margin-top: 8px;
+        margin-top: 9px;
+        max-width: 100%;
       }
       .org-focus-tag-heading {
         color: var(--muted);
-        font-size: .78rem;
+        font-size: .76rem;
         font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: .03em;
+        letter-spacing: .04em;
+        margin-right: 1px;
       }
       .org-focus-tag-chip {
         border: 1px solid #d6d3d1;
         background: #fafaf9;
+        color: #292524;
         border-radius: 999px;
         padding: 4px 9px;
         font-size: .78rem;
         line-height: 1.1;
         cursor: pointer;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .org-focus-tag-chip:hover,
       .org-focus-tag-chip.active {
@@ -107,6 +128,7 @@
       state.activeTag = '';
       setTimeout(() => {
         installFilterBar();
+        observeOrgList();
         refreshOrgTags();
       }, 250);
     });
@@ -174,10 +196,10 @@
     if (!row) {
       row = document.createElement('div');
       row.className = 'org-focus-tag-row';
-      const content = item.querySelector('.record-meta:last-of-type')?.parentElement || item.firstElementChild;
+      const content = item.querySelector('h3')?.parentElement || item.firstElementChild;
       content?.appendChild(row);
     }
-    row.innerHTML = `<span class="org-focus-tag-heading">Focus</span>${tags.map(tag => `<button type="button" class="org-focus-tag-chip ${norm(tag) === norm(state.activeTag) ? 'active' : ''}" data-org-focus-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}`;
+    row.innerHTML = `<span class="org-focus-tag-heading">Focus</span>${tags.map(tag => `<button type="button" class="org-focus-tag-chip ${norm(tag) === norm(state.activeTag) ? 'active' : ''}" data-org-focus-tag="${escapeAttr(tag)}" title="Filter by ${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}`;
     row.querySelectorAll('[data-org-focus-tag]').forEach(btn => {
       btn.addEventListener('click', event => {
         event.preventDefault();
