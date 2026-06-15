@@ -8,6 +8,7 @@
     installBackButton();
     installNavigationTracker();
     loadStartHereHelper();
+    loadOrgTypeHelper();
     loadFocusTagHelper();
     loadReportsHelper();
     updateBackButton();
@@ -68,6 +69,10 @@
 
   function loadStartHereHelper() {
     loadScriptOnce('js/start-here-card.js', 'data-convene-start-here', '__conveneStartHereLoaded');
+  }
+
+  function loadOrgTypeHelper() {
+    loadScriptOnce('js/org-type-control.js', 'data-convene-org-type-control', '__conveneOrgTypeControlLoaded');
   }
 
   function loadFocusTagHelper() {
