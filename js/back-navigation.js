@@ -66,9 +66,9 @@
   }
 
   function loadReportsHelper() {
-    if (document.querySelector('script[data-convene-reports]') || window.__conveneReportsLoaded) return;
+    if (document.querySelector('script[data-convene-reports]') || window.__conveneReportsV2Loaded) return;
     const script = document.createElement('script');
-    script.src = 'js/reports.js';
+    script.src = 'js/reports-v2.js';
     script.defer = true;
     script.dataset.conveneReports = 'true';
     document.body.appendChild(script);
