@@ -15,7 +15,7 @@ on:
       acs_year:
         description: ACS 5-year release year
         required: true
-        default: '2024'
+        default: '2023'
 
 permissions:
   contents: write
