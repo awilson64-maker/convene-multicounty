@@ -4,40 +4,98 @@
 
   var ACCESS_KEY_STORAGE = 'convene:activeAccessKey';
 
+  function boot() {
+    install();
+    setTimeout(install, 350);
+    setTimeout(install, 900);
+
+    var countySelect = document.getElementById('countySelect');
+    if (countySelect) {
+      countySelect.addEventListener('change', function () {
+        setTimeout(install, 150);
+        setTimeout(install, 500);
+      });
+    }
+
+    document.body.addEventListener('click', function (event) {
+      var nav = event.target && event.target.closest && event.target.closest('.nav-btn[data-view="backupView"]');
+      if (nav) {
+        setTimeout(install, 80);
+        setTimeout(install, 400);
+      }
+    }, true);
+  }
+
   function install() {
     var backupView = document.getElementById('backupView');
-    if (!backupView || document.getElementById('legacyExportToolsCard')) return;
+    if (!backupView) return;
 
-    var card = document.createElement('div');
-    card.id = 'legacyExportToolsCard';
-    card.className = 'card legacy-export-tools';
-    card.innerHTML = '' +
-      '<h3>Quick exports</h3>' +
-      '<p class="muted">Export active county records for spreadsheet review, reporting, or safe backup.</p>' +
-      '<div class="legacy-export-actions">' +
-        '<button id="legacyExportJsonBtn" class="primary" type="button">Export JSON Backup</button>' +
-        '<button id="legacyClearAccessBtn" type="button">Clear Saved Access</button>' +
-        '<button id="legacyExportOrgsBtn" type="button">Export Organizations CSV</button>' +
-        '<button id="legacyExportContactsBtn" type="button">Export Contacts CSV</button>' +
-        '<button id="legacyExportActivitiesBtn" type="button">Export Activities CSV</button>' +
-        '<button id="legacyExportTasksBtn" type="button">Export Upcoming Tasks CSV</button>' +
-        '<button id="legacyExportRelationshipsBtn" type="button">Export Relationships CSV</button>' +
-        '<button id="legacyExportCoalitionsBtn" type="button">Export Coalitions CSV</button>' +
-      '</div>';
+    cleanBackupView(backupView);
 
-    var firstCard = backupView.querySelector('.grid, .card');
-    if (firstCard) backupView.insertBefore(card, firstCard);
-    else backupView.appendChild(card);
+    var card = document.getElementById('legacyExportToolsCard');
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'legacyExportToolsCard';
+      card.className = 'card legacy-export-tools';
+      card.innerHTML = '' +
+        '<h3>Quick exports</h3>' +
+        '<p class="muted">Export active county records for spreadsheet review, reporting, or safe backup.</p>' +
+        '<div class="legacy-export-actions">' +
+          '<button id="legacyExportJsonBtn" class="primary" type="button">Export JSON Backup</button>' +
+          '<button id="legacyClearAccessBtn" type="button">Clear Saved Access</button>' +
+          '<button id="legacyExportOrgsBtn" type="button">Export Organizations CSV</button>' +
+          '<button id="legacyExportContactsBtn" type="button">Export Contacts CSV</button>' +
+          '<button id="legacyExportActivitiesBtn" type="button">Export Activities CSV</button>' +
+          '<button id="legacyExportTasksBtn" type="button">Export Upcoming Tasks CSV</button>' +
+          '<button id="legacyExportRelationshipsBtn" type="button">Export Relationships CSV</button>' +
+          '<button id="legacyExportCoalitionsBtn" type="button">Export Coalitions CSV</button>' +
+        '</div>';
+
+      var anchor = firstBackupContent(backupView);
+      if (anchor) backupView.insertBefore(card, anchor);
+      else backupView.appendChild(card);
+
+      bindButton('legacyExportJsonBtn', exportJsonBackup);
+      bindButton('legacyClearAccessBtn', clearSavedAccess);
+      bindButton('legacyExportOrgsBtn', function () { exportCsv('organizations'); });
+      bindButton('legacyExportContactsBtn', function () { exportCsv('contacts'); });
+      bindButton('legacyExportActivitiesBtn', function () { exportCsv('activities'); });
+      bindButton('legacyExportTasksBtn', exportTasksCsv);
+      bindButton('legacyExportRelationshipsBtn', function () { exportCsv('relationships'); });
+      bindButton('legacyExportCoalitionsBtn', exportCoalitionsCsv);
+    } else if (card.parentNode === backupView) {
+      var first = firstBackupContent(backupView);
+      if (first && first !== card) backupView.insertBefore(card, first);
+    }
 
     installStyles();
-    bindButton('legacyExportJsonBtn', exportJsonBackup);
-    bindButton('legacyClearAccessBtn', clearSavedAccess);
-    bindButton('legacyExportOrgsBtn', function () { exportCsv('organizations'); });
-    bindButton('legacyExportContactsBtn', function () { exportCsv('contacts'); });
-    bindButton('legacyExportActivitiesBtn', function () { exportCsv('activities'); });
-    bindButton('legacyExportTasksBtn', exportTasksCsv);
-    bindButton('legacyExportRelationshipsBtn', function () { exportCsv('relationships'); });
-    bindButton('legacyExportCoalitionsBtn', exportCoalitionsCsv);
+  }
+
+  function firstBackupContent(backupView) {
+    var children = Array.prototype.slice.call(backupView.children || []);
+    for (var i = 0; i < children.length; i += 1) {
+      var child = children[i];
+      if (!child || child.id === 'legacyExportToolsCard') continue;
+      if (child.tagName === 'H2') continue;
+      if (child.matches && (child.matches('.card') || child.matches('.grid'))) return child;
+    }
+    return backupView.querySelector('.grid, .card');
+  }
+
+  function cleanBackupView(backupView) {
+    var csvFile = document.getElementById('csvFile');
+    var csvCard = csvFile && csvFile.closest && csvFile.closest('.card');
+    if (csvCard) csvCard.style.display = 'none';
+
+    var bulkCard = document.getElementById('bulkUpdateCard');
+    if (bulkCard) {
+      var heading = bulkCard.querySelector('h3');
+      var paragraph = bulkCard.querySelector('p');
+      if (heading) heading.textContent = 'CSV organization import / update';
+      if (paragraph) paragraph.textContent = 'Upload one CSV to update existing organizations or append new organization records after preview.';
+      var tuckedExport = document.getElementById('exportOrgCsvBtn');
+      if (tuckedExport) tuckedExport.closest('.small-actions').style.display = 'none';
+    }
   }
 
   function installStyles() {
@@ -45,7 +103,7 @@
     var style = document.createElement('style');
     style.id = 'legacyExportToolsStyles';
     style.textContent = '' +
-      '.legacy-export-tools { margin-bottom: 16px; }' +
+      '.legacy-export-tools { margin: 14px 0 16px; }' +
       '.legacy-export-tools h3 { margin-top: 0; }' +
       '.legacy-export-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }' +
       '.legacy-export-actions button { border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 700; background: #e5e5e5; color: #282728; }' +
@@ -60,7 +118,8 @@
   }
 
   function activeCounty() {
-    var id = document.getElementById('countySelect') && document.getElementById('countySelect').value;
+    var select = document.getElementById('countySelect');
+    var id = select && select.value;
     if (window.CONVENE_COUNTIES && window.CONVENE_COUNTIES[id]) return window.CONVENE_COUNTIES[id];
     if (window.CONVENE_COUNTIES && window.CONVENE_DEFAULT_COUNTY) return window.CONVENE_COUNTIES[window.CONVENE_DEFAULT_COUNTY];
     return { id: id || 'county', name: id || 'County', storagePrefix: 'convene:' + (id || 'county') };
@@ -82,8 +141,7 @@
 
   function loadStore(county, name) {
     try {
-      var key = county.storagePrefix + ':' + name;
-      return JSON.parse(localStorage.getItem(key) || '[]');
+      return JSON.parse(localStorage.getItem(county.storagePrefix + ':' + name) || '[]');
     } catch (err) {
       return [];
     }
@@ -92,7 +150,6 @@
   function exportJsonBackup() {
     var county = activeCounty();
     var data = workspace();
-    data.coalitions = coalitions();
     var payload = {
       system: 'CONVENE',
       edition: 'multi-county',
@@ -104,7 +161,7 @@
       contacts: data.contacts || [],
       activities: data.activities || [],
       relationships: data.relationships || [],
-      coalitions: data.coalitions || []
+      coalitions: coalitions(data)
     };
     downloadJson('convene-' + county.id + '-workspace-' + dateStamp() + '.json', payload);
   }
@@ -119,13 +176,14 @@
     var data = workspace();
     var rows = data[storeName] || [];
     var columns = columnsFor(storeName, rows);
-    downloadText('convene-' + activeCounty().id + '-' + storeName + '-' + dateStamp() + '.csv', csvFromRows(rows, columns), 'text/csv;charset=utf-8');
+    downloadText('convene-' + activeCounty().id + '-' + storeName + '-' + dateStamp() + '.csv', csvFromRows(rows, columns, data), 'text/csv;charset=utf-8');
   }
 
   function exportCoalitionsCsv() {
-    var rows = coalitions();
+    var data = workspace();
+    var rows = coalitions(data);
     var columns = columnsFor('coalitions', rows);
-    downloadText('convene-' + activeCounty().id + '-coalitions-' + dateStamp() + '.csv', csvFromRows(rows, columns), 'text/csv;charset=utf-8');
+    downloadText('convene-' + activeCounty().id + '-coalitions-' + dateStamp() + '.csv', csvFromRows(rows, columns, data), 'text/csv;charset=utf-8');
   }
 
   function exportTasksCsv() {
@@ -147,15 +205,14 @@
       return String(a.followUpDate || '').localeCompare(String(b.followUpDate || ''));
     });
     var columns = ['id', 'followUpDate', 'date', 'type', 'summary', 'organizations', 'contacts', 'notes'];
-    downloadText('convene-' + activeCounty().id + '-upcoming-tasks-' + dateStamp() + '.csv', csvFromRows(rows, columns), 'text/csv;charset=utf-8');
+    downloadText('convene-' + activeCounty().id + '-upcoming-tasks-' + dateStamp() + '.csv', csvFromRows(rows, columns, data), 'text/csv;charset=utf-8');
   }
 
-  function coalitions() {
-    var county = activeCounty();
-    var data = workspace();
+  function coalitions(data) {
+    data = data || workspace();
     if (Array.isArray(data.coalitions)) return data.coalitions;
     if (Array.isArray(data.legacyCoalitions)) return data.legacyCoalitions;
-    return loadStore(county, 'coalitions');
+    return loadStore(activeCounty(), 'coalitions');
   }
 
   function columnsFor(storeName, rows) {
@@ -176,8 +233,8 @@
     return base.concat(extra);
   }
 
-  function csvFromRows(rows, columns) {
-    var data = workspace();
+  function csvFromRows(rows, columns, data) {
+    data = data || workspace();
     var out = [columns.map(csvCell).join(',')];
     (rows || []).forEach(function (row) {
       out.push(columns.map(function (column) {
@@ -195,7 +252,6 @@
     if (column === 'toOrgName') return nameById(row.toOrgId || row.targetOrgId, data.organizations || []);
     if (column === 'organizationIds' && Array.isArray(row.organizationIds)) return row.organizationIds.join('; ');
     if (column === 'contactIds' && Array.isArray(row.contactIds)) return row.contactIds.join('; ');
-    if (column === 'organizationNames') return namesFromIds(row.organizationIds || row.organizationId || row.organizationIds, data.organizations || []);
     return row[column] == null ? '' : row[column];
   }
 
@@ -233,14 +289,6 @@
     return new Date().toISOString().slice(0, 10);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    install();
-    document.getElementById('countySelect') && document.getElementById('countySelect').addEventListener('change', function () {
-      setTimeout(install, 150);
-    });
-    document.body.addEventListener('click', function (event) {
-      var nav = event.target && event.target.closest && event.target.closest('.nav-btn[data-view="backupView"]');
-      if (nav) setTimeout(install, 150);
-    }, true);
-  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
