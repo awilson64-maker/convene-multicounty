@@ -16,7 +16,6 @@
       '<p class="muted">Export active county records for spreadsheet review, reporting, or safe backup.</p>' +
       '<div class="legacy-export-actions">' +
         '<button id="legacyExportJsonBtn" class="primary" type="button">Export JSON Backup</button>' +
-        '<button id="legacyExportAccessKeyBtn" type="button">Generate Access Key JSON</button>' +
         '<button id="legacyClearAccessBtn" type="button">Clear Saved Access</button>' +
         '<button id="legacyExportOrgsBtn" type="button">Export Organizations CSV</button>' +
         '<button id="legacyExportContactsBtn" type="button">Export Contacts CSV</button>' +
@@ -32,7 +31,6 @@
 
     installStyles();
     bindButton('legacyExportJsonBtn', exportJsonBackup);
-    bindButton('legacyExportAccessKeyBtn', exportAccessKey);
     bindButton('legacyClearAccessBtn', clearSavedAccess);
     bindButton('legacyExportOrgsBtn', function () { exportCsv('organizations'); });
     bindButton('legacyExportContactsBtn', function () { exportCsv('contacts'); });
@@ -109,21 +107,6 @@
       coalitions: data.coalitions || []
     };
     downloadJson('convene-' + county.id + '-workspace-' + dateStamp() + '.json', payload);
-  }
-
-  function exportAccessKey() {
-    var county = activeCounty();
-    var key = {
-      system: 'CONVENE',
-      edition: 'multi-county',
-      role: 'county_user',
-      countyId: county.id,
-      countyName: county.name,
-      allowedCounties: [county.id],
-      canGenerateKeys: false,
-      createdAt: new Date().toISOString()
-    };
-    downloadJson('convene-access-key-' + county.id + '.json', key);
   }
 
   function clearSavedAccess() {
