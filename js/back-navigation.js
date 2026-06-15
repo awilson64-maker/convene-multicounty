@@ -7,6 +7,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     installBackButton();
     installNavigationTracker();
+    loadStartHereHelper();
     loadFocusTagHelper();
     loadReportsHelper();
     updateBackButton();
@@ -63,6 +64,10 @@
     script.defer = true;
     script.setAttribute(attr, 'true');
     document.body.appendChild(script);
+  }
+
+  function loadStartHereHelper() {
+    loadScriptOnce('js/start-here-card.js', 'data-convene-start-here', '__conveneStartHereLoaded');
   }
 
   function loadFocusTagHelper() {
