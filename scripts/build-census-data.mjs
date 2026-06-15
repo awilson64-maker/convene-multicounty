@@ -7,6 +7,7 @@ const COUNTIES = {
 };
 
 const REQUESTED_ACS_YEAR = process.env.ACS_YEAR || '2023';
+const CENSUS_API_KEY = process.env.CENSUS_API_KEY || '';
 const ACS_CHUNK_SIZE = 24;
 
 const CORE_VARS = ['NAME'];
@@ -69,6 +70,10 @@ async function main() {
   const selected = choice === 'all' ? Object.values(COUNTIES) : [COUNTIES[choice]].filter(Boolean);
   if (!selected.length) throw new Error(`Unknown county choice: ${choice}`);
 
+  if (!CENSUS_API_KEY) {
+    console.warn('Warning: CENSUS_API_KEY is not set. The Census API may reject GitHub Actions requests with a Missing Key error. Add a repository secret named CENSUS_API_KEY.');
+  }
+
   for (const county of selected) {
     console.log(`Building ${county.name}; requested ACS ${REQUESTED_ACS_YEAR}...`);
     const { rows: acsRows, year: acsYear } = await fetchAcsWithFallback(county);
@@ -114,9 +119,14 @@ async function fetchAcs(county, year) {
 
   for (let index = 0; index < chunks.length; index += 1) {
     const get = [...CORE_VARS, ...chunks[index]].join(',');
-    const url = `https://api.census.gov/data/${year}/acs/acs5?get=${get}&for=tract:*&in=state:${county.state}%20county:${county.county}`;
+    const url = new URL(`https://api.census.gov/data/${year}/acs/acs5`);
+    url.searchParams.set('get', get);
+    url.searchParams.set('for', 'tract:*');
+    url.searchParams.set('in', `state:${county.state} county:${county.county}`);
+    if (CENSUS_API_KEY) url.searchParams.set('key', CENSUS_API_KEY);
+
     console.log(`Fetching ACS ${year} chunk ${index + 1}/${chunks.length} for ${county.name}...`);
-    const json = await fetchJson(url, `ACS ${year} chunk ${index + 1} for ${county.name}`);
+    const json = await fetchJson(url, `ACS ${year} chunk ${index + 1} for ${county.name}`, { redactKey: true });
     const [header, ...rows] = json;
 
     if (!Array.isArray(header) || !header.includes('state') || !header.includes('county') || !header.includes('tract')) {
@@ -137,29 +147,40 @@ async function fetchAcs(county, year) {
 }
 
 async function fetchTracts(county) {
-  const where = encodeURIComponent(`STATE='${county.state}' AND COUNTY='${county.county}'`);
-  const outFields = encodeURIComponent('GEOID,STATE,COUNTY,TRACT,NAME');
-  const url = `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/8/query?where=${where}&outFields=${outFields}&outSR=4326&f=geojson`;
+  const url = new URL('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/8/query');
+  url.searchParams.set('where', `STATE='${county.state}' AND COUNTY='${county.county}'`);
+  url.searchParams.set('outFields', 'GEOID,STATE,COUNTY,TRACT,NAME');
+  url.searchParams.set('outSR', '4326');
+  url.searchParams.set('f', 'geojson');
+
   const json = await fetchJson(url, `TIGERweb tracts for ${county.name}`);
   if (!json.features?.length) throw new Error(`No TIGERweb tract features returned for ${county.name}.`);
   return json;
 }
 
-async function fetchJson(url, label) {
+async function fetchJson(urlLike, label, options = {}) {
+  const url = urlLike instanceof URL ? urlLike : new URL(urlLike);
   const response = await fetch(url, { headers: { 'User-Agent': 'CONVENE census builder' } });
   const contentType = response.headers.get('content-type') || '';
   const text = await response.text();
+  const safeUrl = options.redactKey ? redactSensitiveUrl(url) : url.toString();
 
   if (!response.ok) {
-    throw new Error(`${label} failed with HTTP ${response.status}. URL: ${url}\n${text.slice(0, 700)}`);
+    throw new Error(`${label} failed with HTTP ${response.status}. URL: ${safeUrl}\n${text.slice(0, 700)}`);
   }
 
   try {
     return JSON.parse(text);
   } catch (error) {
     const snippet = text.replace(/\s+/g, ' ').slice(0, 700);
-    throw new Error(`${label} returned non-JSON content. Content-Type: ${contentType || 'unknown'}. URL: ${url}\n${snippet}`);
+    throw new Error(`${label} returned non-JSON content. Content-Type: ${contentType || 'unknown'}. URL: ${safeUrl}\n${snippet}`);
   }
+}
+
+function redactSensitiveUrl(urlLike) {
+  const url = new URL(urlLike.toString());
+  if (url.searchParams.has('key')) url.searchParams.set('key', 'REDACTED');
+  return url.toString();
 }
 
 function buildPayload(county, rows, tractGeojson, acsYear) {
