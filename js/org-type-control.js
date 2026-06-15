@@ -27,18 +27,19 @@
 
   function init() {
     installStyles();
-    installTypeControl();
+    ensureTypeDropdown();
+    refreshTypeOptions();
     bindEvents();
     setInterval(refreshTypeOptions, 1500);
   }
 
-  function installTypeControl() {
+  function ensureTypeDropdown() {
     const field = document.getElementById('type');
-    if (!field) return;
+    if (!field) return null;
 
     if (field.tagName === 'SELECT') {
-      refreshTypeOptions();
-      return;
+      ensureCustomInput(field);
+      return field;
     }
 
     const current = field.value || '';
@@ -47,32 +48,39 @@
     select.name = field.name || 'type';
     select.className = field.className || '';
     select.dataset.conveneTypeDropdown = 'true';
+    select.dataset.pendingValue = current;
 
     field.replaceWith(select);
+    ensureCustomInput(select);
+    return select;
+  }
 
-    const custom = document.createElement('input');
+  function ensureCustomInput(select) {
+    let custom = document.getElementById('orgTypeCustom');
+    if (custom) return custom;
+    custom = document.createElement('input');
     custom.id = 'orgTypeCustom';
     custom.type = 'text';
     custom.placeholder = 'Enter new organization type...';
     custom.className = 'org-type-custom-input';
     custom.hidden = true;
     select.insertAdjacentElement('afterend', custom);
-
-    refreshTypeOptions(current);
+    return custom;
   }
 
   function bindEvents() {
     document.body.addEventListener('click', event => {
-      if (event.target.closest('#addOrgBtn') || event.target.closest('.edit-org') || event.target.closest('[data-action="edit-org"]')) {
-        setTimeout(() => refreshTypeOptions(), 75);
-        setTimeout(() => refreshTypeOptions(), 250);
+      if (event.target.closest('#addOrgBtn') || event.target.closest('[data-edit-org]') || event.target.closest('.edit-org') || event.target.closest('[data-action="edit-org"]')) {
+        setTimeout(refreshTypeOptions, 75);
+        setTimeout(refreshTypeOptions, 250);
+        setTimeout(refreshTypeOptions, 600);
       }
       if (event.target.closest('#saveOrgBtn')) commitCustomType();
     }, true);
 
     document.body.addEventListener('change', event => {
       if (event.target && event.target.id === 'type') handleTypeChange();
-      if (event.target && event.target.id === 'countySelect') setTimeout(() => refreshTypeOptions(), 150);
+      if (event.target && event.target.id === 'countySelect') setTimeout(refreshTypeOptions, 150);
     });
 
     document.body.addEventListener('submit', event => {
@@ -113,28 +121,32 @@
 
     ensureOption(select, cleaned);
     select.value = cleaned;
+    select.dataset.pendingValue = cleaned;
     custom.hidden = true;
   }
 
   function refreshTypeOptions(preferredValue) {
-    installTypeControl();
-    const select = document.getElementById('type');
+    const select = ensureTypeDropdown();
     if (!select || select.tagName !== 'SELECT') return;
 
-    const currentValue = preferredValue || select.value || '';
+    const currentValue = preferredValue || select.dataset.pendingValue || select.value || '';
     const types = getTypeList(currentValue);
 
+    const previous = select.value;
     select.innerHTML = '';
     select.appendChild(option('', 'Select type...'));
     types.forEach(type => select.appendChild(option(type, type)));
     select.appendChild(option(NEW_VALUE, '+ Add new type...'));
 
-    if (currentValue && types.includes(currentValue)) select.value = currentValue;
-    else if (currentValue && currentValue !== NEW_VALUE) {
-      ensureOption(select, currentValue);
-      select.value = currentValue;
+    const target = cleanType(currentValue || previous);
+    if (target && types.includes(target)) select.value = target;
+    else if (target && target !== NEW_VALUE) {
+      ensureOption(select, target);
+      select.value = target;
+    } else {
+      select.value = '';
     }
-
+    select.dataset.pendingValue = '';
     handleTypeChange();
   }
 
@@ -177,6 +189,7 @@
     const opt = document.createElement('option');
     opt.value = value;
     opt.textContent = label;
+    opt.label = label;
     return opt;
   }
 
