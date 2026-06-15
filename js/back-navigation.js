@@ -13,6 +13,7 @@
     loadCompactListHelper();
     loadOrgListControlsHelper();
     loadBackupExportToolsHelper();
+    loadBulkCsvImportAliasHelper();
     loadReportsHelper();
     updateBackButton();
   });
@@ -94,6 +95,10 @@
 
   function loadBackupExportToolsHelper() {
     loadScriptOnce('js/backup-export-tools.js', 'data-convene-backup-export-tools', '__conveneBackupExportToolsLoaded');
+  }
+
+  function loadBulkCsvImportAliasHelper() {
+    loadScriptOnce('js/bulk-csv-import-aliases.js', 'data-convene-bulk-csv-import-aliases', '__conveneBulkCsvImportAliasesLoaded');
   }
 
   function loadReportsHelper() {
