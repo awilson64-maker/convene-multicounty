@@ -35,6 +35,7 @@ jobs:
       - name: Build census tract data
         env:
           ACS_YEAR: ${{ inputs.acs_year }}
+          CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
         run: node scripts/build-census-data.mjs ${{ inputs.county }}
 
       - name: Commit updated data files
