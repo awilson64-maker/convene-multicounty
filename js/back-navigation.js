@@ -108,6 +108,7 @@
 
   function loadReportsHelper() {
     loadScriptOnce('js/reports-v2.js', 'data-convene-reports', '__conveneReportsV2Loaded');
+    loadScriptOnce('js/reports-standard-router.js', 'data-convene-reports-standard-router', '__conveneReportsStandardRouterLoaded');
     loadScriptOnce('js/reports-filter-repair.js', 'data-convene-reports-filter-repair', '__conveneReportsFilterRepairLoaded');
     loadScriptOnce('js/reports-gap-action-priority.js', 'data-convene-gap-action-priority', '__conveneGapActionPriorityLoaded');
     loadScriptOnce('js/reports-gap-sort-fix.js', 'data-convene-gap-sort-fix', '__conveneGapSortFixLoaded');
