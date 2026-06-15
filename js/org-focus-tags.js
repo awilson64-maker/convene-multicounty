@@ -6,7 +6,8 @@
     activeTag: '',
     observerStarted: false,
     applying: false,
-    booted: false
+    booted: false,
+    delegatedClicks: false
   };
 
   bootWhenReady();
@@ -25,6 +26,7 @@
     installStyles();
     installFilterBar();
     bindFilterEvents();
+    bindDelegatedTagClicks();
     observeOrgList();
     setTimeout(refreshOrgTags, 150);
     setTimeout(refreshOrgTags, 550);
@@ -91,6 +93,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        pointer-events: auto;
       }
       .org-focus-tag-chip:hover,
       .org-focus-tag-chip.active {
@@ -140,6 +143,20 @@
       if (!el) return;
       el.addEventListener(id === 'orgTypeFilter' ? 'change' : 'input', () => setTimeout(refreshOrgTags, 80));
     });
+  }
+
+  function bindDelegatedTagClicks() {
+    if (state.delegatedClicks) return;
+    state.delegatedClicks = true;
+    document.addEventListener('click', event => {
+      const chip = event.target.closest('[data-org-focus-tag]');
+      if (!chip) return;
+      const orgView = document.getElementById('orgView');
+      if (orgView && !orgView.contains(chip)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      applyTagFilter(chip.getAttribute('data-org-focus-tag') || chip.textContent || '');
+    }, true);
   }
 
   function observeOrgList() {
@@ -200,12 +217,6 @@
       content?.appendChild(row);
     }
     row.innerHTML = `<span class="org-focus-tag-heading">Focus</span>${tags.map(tag => `<button type="button" class="org-focus-tag-chip ${norm(tag) === norm(state.activeTag) ? 'active' : ''}" data-org-focus-tag="${escapeAttr(tag)}" title="Filter by ${escapeAttr(tag)}">${escapeHtml(tag)}</button>`).join('')}`;
-    row.querySelectorAll('[data-org-focus-tag]').forEach(btn => {
-      btn.addEventListener('click', event => {
-        event.preventDefault();
-        applyTagFilter(btn.dataset.orgFocusTag || '');
-      });
-    });
   }
 
   function applyTagFilter(tag) {
