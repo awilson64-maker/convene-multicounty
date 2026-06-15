@@ -5,6 +5,7 @@
   };
 
   document.addEventListener('DOMContentLoaded', () => {
+    loadStartupSplashHelper();
     installBackButton();
     installNavigationTracker();
     loadStartHereHelper();
@@ -60,6 +61,10 @@
       .topbar-actions { gap: 10px; align-items: center; }
     `;
     document.head.appendChild(style);
+  }
+
+  function loadStartupSplashHelper() {
+    loadScriptOnce('js/startup-splash.js', 'data-convene-startup-splash', '__conveneStartupSplashLoaded');
   }
 
   function loadScriptOnce(src, attr, flagName) {
