@@ -143,6 +143,13 @@
       if (!el) return;
       el.addEventListener(id === 'orgTypeFilter' ? 'change' : 'input', () => setTimeout(refreshOrgTags, 80));
     });
+
+    document.addEventListener('change', event => {
+      const target = event.target;
+      if (!target || target.id !== 'orgStatusFilter') return;
+      setTimeout(refreshOrgTags, 120);
+      setTimeout(refreshOrgTags, 350);
+    }, true);
   }
 
   function bindDelegatedTagClicks() {
@@ -182,19 +189,32 @@
       const orgByName = new Map((data.organizations || []).map(org => [norm(org.name), org]));
 
       const items = [...list.querySelectorAll('.record-item')];
-      let visible = 0;
+      items.forEach(item => item.classList.remove('org-focus-hidden'));
+
+      let currentListTotal = 0;
+      let visibleAfterFocus = 0;
       items.forEach(item => {
+        const visibleBeforeFocus = isVisibleBeforeFocus(item);
         const org = findOrgForItem(item, orgById, orgByName);
         const tags = focusTags(org);
         renderTagsForItem(item, tags);
         const matchesTag = !state.activeTag || tags.some(tag => norm(tag) === norm(state.activeTag));
-        item.classList.toggle('org-focus-hidden', !matchesTag);
-        if (matchesTag) visible += 1;
+
+        if (visibleBeforeFocus) currentListTotal += 1;
+        if (visibleBeforeFocus && matchesTag) visibleAfterFocus += 1;
+        item.classList.toggle('org-focus-hidden', visibleBeforeFocus && !matchesTag);
       });
-      renderActiveFilter(items.length, visible);
+      renderActiveFilter(currentListTotal, visibleAfterFocus);
     } finally {
       state.applying = false;
     }
+  }
+
+  function isVisibleBeforeFocus(item) {
+    if (!item) return false;
+    if (item.hidden) return false;
+    if (item.style && item.style.display === 'none') return false;
+    return true;
   }
 
   function findOrgForItem(item, orgById, orgByName) {
@@ -223,6 +243,7 @@
     state.activeTag = tag;
     const search = document.getElementById('orgSearchBox');
     const type = document.getElementById('orgTypeFilter');
+    const status = document.getElementById('orgStatusFilter');
     let needsRerender = false;
     if (search && search.value) {
       search.value = '';
@@ -232,9 +253,14 @@
       type.value = '';
       needsRerender = true;
     }
+    if (status && status.value) {
+      status.value = '';
+      needsRerender = true;
+    }
     if (needsRerender) {
       search?.dispatchEvent(new Event('input', { bubbles: true }));
       type?.dispatchEvent(new Event('change', { bubbles: true }));
+      status?.dispatchEvent(new Event('change', { bubbles: true }));
     }
     setTimeout(refreshOrgTags, 90);
   }
@@ -243,6 +269,7 @@
     state.activeTag = '';
     const search = document.getElementById('orgSearchBox');
     const type = document.getElementById('orgTypeFilter');
+    const status = document.getElementById('orgStatusFilter');
     if (search) {
       search.value = '';
       search.dispatchEvent(new Event('input', { bubbles: true }));
@@ -250,6 +277,10 @@
     if (type) {
       type.value = '';
       type.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (status) {
+      status.value = '';
+      status.dispatchEvent(new Event('change', { bubbles: true }));
     }
     setTimeout(refreshOrgTags, 90);
   }
@@ -264,10 +295,12 @@
     }
     if (count) {
       count.textContent = state.activeTag
-        ? `${visible} organization${visible === 1 ? '' : 's'} with this focus tag`
-        : total ? `${total} organization${total === 1 ? '' : 's'} in the current list` : '';
+        ? `${visible} organization${visible === 1 ? '' : 's'} with this focus tag in the current list`
+        : total ? `${total} organization${total === 1 ? '' : 's'} in the current list` : 'No organizations in the current list';
     }
-    if (clear) clear.style.display = (state.activeTag || document.getElementById('orgSearchBox')?.value || document.getElementById('orgTypeFilter')?.value) ? '' : 'none';
+    if (clear) {
+      clear.style.display = (state.activeTag || document.getElementById('orgSearchBox')?.value || document.getElementById('orgTypeFilter')?.value || document.getElementById('orgStatusFilter')?.value) ? '' : 'none';
+    }
   }
 
   function workspace() {
