@@ -2,7 +2,6 @@
   if (window.__conveneOrgTypeControlLoaded) return;
   window.__conveneOrgTypeControlLoaded = true;
 
-  const NEW_VALUE = '__convene_add_new_type__';
   const CANONICAL_TYPES = [
     'Aging / Disability',
     'Aging & Disability Resource Center',
@@ -38,7 +37,7 @@
     if (!field) return null;
 
     if (field.tagName === 'SELECT') {
-      ensureCustomInput(field);
+      ensureAddButton(field);
       return field;
     }
 
@@ -51,21 +50,21 @@
     select.dataset.pendingValue = current;
 
     field.replaceWith(select);
-    ensureCustomInput(select);
+    ensureAddButton(select);
     return select;
   }
 
-  function ensureCustomInput(select) {
-    let custom = document.getElementById('orgTypeCustom');
-    if (custom) return custom;
-    custom = document.createElement('input');
-    custom.id = 'orgTypeCustom';
-    custom.type = 'text';
-    custom.placeholder = 'Enter new organization type...';
-    custom.className = 'org-type-custom-input';
-    custom.hidden = true;
-    select.insertAdjacentElement('afterend', custom);
-    return custom;
+  function ensureAddButton(select) {
+    if (!select || document.getElementById('orgTypeAddBtn')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'orgTypeAddBtn';
+    btn.type = 'button';
+    btn.className = 'org-type-add-btn';
+    btn.textContent = '+ Add new type';
+    btn.setAttribute('aria-label', 'Add new organization type');
+
+    select.insertAdjacentElement('afterend', btn);
   }
 
   function bindEvents() {
@@ -75,54 +74,31 @@
         setTimeout(refreshTypeOptions, 250);
         setTimeout(refreshTypeOptions, 600);
       }
-      if (event.target.closest('#saveOrgBtn')) commitCustomType();
+
+      if (event.target.closest('#orgTypeAddBtn')) {
+        event.preventDefault();
+        addNewType();
+      }
     }, true);
 
     document.body.addEventListener('change', event => {
-      if (event.target && event.target.id === 'type') handleTypeChange();
       if (event.target && event.target.id === 'countySelect') setTimeout(refreshTypeOptions, 150);
     });
-
-    document.body.addEventListener('submit', event => {
-      if (event.target && event.target.id === 'orgForm') commitCustomType();
-    }, true);
-
-    document.body.addEventListener('keydown', event => {
-      if (event.target && event.target.id === 'orgTypeCustom' && event.key === 'Enter') {
-        event.preventDefault();
-        commitCustomType();
-        document.getElementById('saveOrgBtn')?.focus();
-      }
-    });
   }
 
-  function handleTypeChange() {
+  function addNewType() {
     const select = document.getElementById('type');
-    const custom = document.getElementById('orgTypeCustom');
-    if (!select || !custom) return;
-    const isNew = select.value === NEW_VALUE;
-    custom.hidden = !isNew;
-    if (isNew) {
-      custom.value = '';
-      setTimeout(() => custom.focus(), 0);
-    }
-  }
+    if (!select) return;
 
-  function commitCustomType() {
-    const select = document.getElementById('type');
-    const custom = document.getElementById('orgTypeCustom');
-    if (!select || !custom || select.value !== NEW_VALUE) return;
-
-    const cleaned = cleanType(custom.value);
-    if (!cleaned) {
-      custom.focus();
-      return;
-    }
+    const entered = window.prompt('Enter the new organization type:');
+    const cleaned = cleanType(entered);
+    if (!cleaned) return;
 
     ensureOption(select, cleaned);
+    sortOptions(select);
     select.value = cleaned;
     select.dataset.pendingValue = cleaned;
-    custom.hidden = true;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   function refreshTypeOptions(preferredValue) {
@@ -136,18 +112,19 @@
     select.innerHTML = '';
     select.appendChild(option('', 'Select type...'));
     types.forEach(type => select.appendChild(option(type, type)));
-    select.appendChild(option(NEW_VALUE, '+ Add new type...'));
 
     const target = cleanType(currentValue || previous);
     if (target && types.includes(target)) select.value = target;
-    else if (target && target !== NEW_VALUE) {
+    else if (target) {
       ensureOption(select, target);
+      sortOptions(select);
       select.value = target;
     } else {
       select.value = '';
     }
+
     select.dataset.pendingValue = '';
-    handleTypeChange();
+    ensureAddButton(select);
   }
 
   function getTypeList(extra) {
@@ -157,7 +134,7 @@
       if (value) values.add(value);
     });
     const cleanedExtra = cleanType(extra);
-    if (cleanedExtra && cleanedExtra !== NEW_VALUE) values.add(cleanedExtra);
+    if (cleanedExtra) values.add(cleanedExtra);
     return Array.from(values).sort((a, b) => a.localeCompare(b));
   }
 
@@ -179,9 +156,25 @@
   }
 
   function ensureOption(select, value) {
-    if (!Array.from(select.options).some(opt => opt.value === value)) {
-      const addNew = Array.from(select.options).find(opt => opt.value === NEW_VALUE);
-      select.insertBefore(option(value, value), addNew || null);
+    const cleaned = cleanType(value);
+    if (!cleaned) return;
+    if (!Array.from(select.options).some(opt => opt.value === cleaned)) {
+      select.appendChild(option(cleaned, cleaned));
+    }
+  }
+
+  function sortOptions(select) {
+    const selectedValue = select.value;
+    const placeholder = Array.from(select.options).find(opt => opt.value === '') || option('', 'Select type...');
+    const options = Array.from(select.options)
+      .filter(opt => opt.value !== '')
+      .sort((a, b) => a.textContent.localeCompare(b.textContent));
+
+    select.innerHTML = '';
+    select.appendChild(placeholder);
+    options.forEach(opt => select.appendChild(opt));
+    if (selectedValue && Array.from(select.options).some(opt => opt.value === selectedValue)) {
+      select.value = selectedValue;
     }
   }
 
@@ -202,9 +195,24 @@
     const style = document.createElement('style');
     style.id = 'orgTypeControlStyles';
     style.textContent = `
-      .org-type-custom-input {
+      #type + .org-type-add-btn,
+      #type + #orgTypeAddBtn {
         margin-top: 6px;
-        width: 100%;
+        width: auto;
+        align-self: flex-start;
+        border: 1px solid rgba(197, 5, 12, 0.35);
+        background: #fff;
+        color: #9b0000;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      #type + .org-type-add-btn:hover,
+      #type + #orgTypeAddBtn:hover {
+        background: #fff5f5;
       }
     `;
     document.head.appendChild(style);
