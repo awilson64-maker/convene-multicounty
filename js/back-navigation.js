@@ -68,6 +68,7 @@
   function loadFocusTagHelper() {
     loadScriptOnce('js/org-focus-tags.js', 'data-convene-focus-tags', '__conveneOrgFocusTagsLoaded');
     loadScriptOnce('js/org-tag-clickfix.js', 'data-convene-focus-clickfix', '__conveneOrgTagClickFixLoaded');
+    loadScriptOnce('js/focus-tag-cleanup.js', 'data-convene-focus-cleanup', '__conveneFocusTagCleanupLoaded');
   }
 
   function loadReportsHelper() {
