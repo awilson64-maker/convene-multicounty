@@ -4,6 +4,27 @@
 
   let lastReportHtml = '';
 
+  const censusMetrics = {
+    poverty: { label: 'Poverty rate', suffix: '%', inverse: false },
+    childPoverty: { label: 'Child poverty rate', suffix: '%', inverse: false },
+    familiesPovertyChildren: { label: 'Families in poverty with children', suffix: '%', inverse: false },
+    income: { label: 'Median household income', prefix: '$', inverse: true },
+    noVehicle: { label: 'No-vehicle households', suffix: '%', inverse: false },
+    senior: { label: 'Age 65+', suffix: '%', inverse: false },
+    children: { label: 'Children under 18', suffix: '%', inverse: false },
+    unemployment: { label: 'Unemployment rate', suffix: '%', inverse: false },
+    rentBurden: { label: 'Rent-burdened renters', suffix: '%', inverse: false },
+    snap: { label: 'SNAP households', suffix: '%', inverse: false },
+    noInternet: { label: 'No internet access', suffix: '%', inverse: false },
+    limitedEnglish: { label: 'Limited-English households', suffix: '%', inverse: false },
+    compositePovertyChildren: { label: 'Poverty + children score', suffix: ' / 100', inverse: false },
+    compositePovertyNoVehicle: { label: 'Poverty + no vehicle score', suffix: ' / 100', inverse: false },
+    compositeSeniorAccess: { label: 'Senior access score', suffix: ' / 100', inverse: false },
+    compositeHousingPressure: { label: 'Housing pressure score', suffix: ' / 100', inverse: false },
+    compositeDigitalAccess: { label: 'Digital access score', suffix: ' / 100', inverse: false },
+    compositeLanguagePoverty: { label: 'Language + poverty score', suffix: ' / 100', inverse: false }
+  };
+
   document.addEventListener('click', event => {
     if (event.target.closest('#generateReportBtn')) {
       event.preventDefault();
@@ -110,13 +131,27 @@
   }
 
   function gapBody(data, orgs, activities, census, settings) {
-    const tracts = priorityTracts(census, orgs).slice(0, 12);
+    const metricKey = metricForGap(settings);
+    const metric = censusMetrics[metricKey] || censusMetrics.compositePovertyNoVehicle;
+    const tracts = priorityTracts(census, orgs, metricKey).slice(0, 12);
+    const all = allTracts(census, metricKey);
+    const mappedAssets = orgs.filter(hasCoords);
+    const scopeMissing = !settings.serviceType && !settings.focusTag;
+
+    if (scopeMissing) {
+      return `
+        ${metricSection([['County organizations', data.organizations.length], ['Mapped organizations', data.organizations.filter(hasCoords).length], ['Census tracts', all.length], ['ACS year', census?.acsYear || 'n/a'], ['Selected service/focus', 'None'], ['Report status', 'Needs lens']])}
+        ${section('Choose a service or focus lens', `<div class="report-callout"><p><b>This report needs a selected service type or focus tag.</b> Otherwise CONVENE has to treat every mapped organization as a possible asset, which makes the access-gap numbers meaningless. Choose something like <b>Food Security</b>, <b>Housing</b>, <b>Aging / Disability</b>, or another focus tag, then generate the report again.</p></div>`)}
+        ${section('Census need layer ready', `<p>The county census file loaded ${all.length} tracts. Once a service/focus lens is selected, this report will compare the selected mapped assets against the <b>${escapeHtml(metric.label)}</b> need layer.</p>`)}
+        ${section('Highest-need tracts before asset comparison', tractNeedOnlyTable(all.slice(0, 12), metricKey))}`;
+    }
+
     return `
-      ${metricSection([['Relevant orgs', orgs.length], ['Mapped assets', orgs.filter(hasCoords).length], ['Census tracts', allTracts(census).length], ['Priority tracts shown', tracts.length], ['No nearby assets', tracts.filter(t => t.assetCount === 0).length], ['Activities', activities.length]])}
-      ${section('Geographic access readout', `<p>This report compares tract-level need signals with mapped assets in the selected service or focus scope. Treat high-priority tracts as planning signals for follow-up, not as proof that no service exists.</p>`)}
-      ${section('Priority tract table', tractTable(tracts))}
-      ${settings.includeCharts ? section('Gap visuals', `<div class="chart-grid">${barChart('Priority tracts', tracts.map(t => [t.name, t.priority]), 12)}${barChart('Assets within 10 miles', tracts.map(t => [t.name, t.assetCount]), 12)}</div>`) : ''}
-      ${settings.includeOrgList ? orgTable(orgs.filter(hasCoords), 'Mapped organizations used as assets') : ''}
+      ${metricSection([['Relevant orgs', orgs.length], ['Mapped matching assets', mappedAssets.length], ['Census tracts', all.length], ['Priority tracts shown', tracts.length], ['No nearby matching assets', tracts.filter(t => t.assetCount === 0).length], ['Activities', activities.length]])}
+      ${section('Geographic access readout', `<p>This report compares tract-level need signals with mapped assets matching <b>${escapeHtml(settings.focusTag || settings.serviceType)}</b>. The selected Census need layer is <b>${escapeHtml(metric.label)}</b>. Treat high-priority tracts as planning signals for follow-up, not as proof that no service exists.</p>${mappedAssets.length ? '' : '<div class="report-callout"><p><b>No mapped organizations match this service/focus lens.</b> That may mean a real gap, or it may mean the CRM records need better tags, categories, or coordinates.</p></div>'}`)}
+      ${section('Priority tract table', tractTable(tracts, metricKey))}
+      ${settings.includeCharts ? section('Gap visuals', `<div class="chart-grid">${barChart('Priority score', tracts.map(t => [t.name, t.priority]), 12)}${barChart('Matching assets within 10 miles', tracts.map(t => [t.name, t.assetCount]), 12)}</div>`) : ''}
+      ${settings.includeOrgList ? orgTable(mappedAssets, 'Mapped organizations used as matching assets') : ''}
       ${settings.includeActivities ? activitySection(activities, data.organizations) : ''}`;
   }
 
@@ -272,27 +307,52 @@
     }
   }
 
-  function allTracts(census) {
-    const features = census?.geojson?.features || census?.features || [];
-    return features.map(feature => {
-      const p = feature.properties || {};
-      return {
-        name: p.name || p.NAME || p.tract || p.GEOID || 'Tract',
-        population: Number(p.population ?? p.totalPopulation ?? p.B01001_001E ?? 0),
-        need: Number(p.needScore ?? p.relativeNeedScore ?? p.priorityScore ?? p.compositeScore ?? 0),
-        center: centerOf(feature.geometry)
-      };
-    });
+  function metricForGap(settings) {
+    const text = `${settings.serviceType || ''} ${settings.focusTag || ''}`.toLowerCase();
+    if (/aging|senior|older|elder|disab|adrc/.test(text)) return 'compositeSeniorAccess';
+    if (/housing|homeless|rent|eviction|shelter/.test(text)) return 'compositeHousingPressure';
+    if (/child|children|youth|family|families|school|education|literacy/.test(text)) return 'compositePovertyChildren';
+    if (/internet|digital|broadband|technology/.test(text)) return 'compositeDigitalAccess';
+    if (/language|english|immigrant|latino|hispanic|spanish/.test(text)) return 'compositeLanguagePoverty';
+    if (/workforce|employment|job|career|training/.test(text)) return 'unemployment';
+    if (/food|pantry|meal|nutrition|hunger|basic|transport|vehicle|ride|transit|health|medical|dental|behavioral|mental|recovery|substance|addiction/.test(text)) return 'compositePovertyNoVehicle';
+    return 'compositePovertyNoVehicle';
   }
 
-  function priorityTracts(census, orgs) {
+  function allTracts(census, metricKey = 'compositePovertyNoVehicle') {
+    const features = census?.geojson?.features || census?.features || [];
+    const tracts = features.map(feature => {
+      const p = feature.properties || {};
+      const acs = p.acs || {};
+      const rawValue = firstNumber(acs[metricKey], p[metricKey]);
+      return {
+        name: tractLabel(p),
+        population: firstNumber(acs.population, acs.totalPopulation, acs.totalPop, acs.pop, acs.B01001_001E, p.population),
+        rawValue,
+        center: centerOf(feature.geometry),
+        feature
+      };
+    }).filter(t => Number.isFinite(Number(t.rawValue)));
+
+    const metric = censusMetrics[metricKey] || censusMetrics.compositePovertyNoVehicle;
+    const values = tracts.map(t => Number(t.rawValue)).filter(Number.isFinite).sort((a, b) => a - b);
+    const min = values[0];
+    const max = values[values.length - 1];
+    return tracts.map(tract => ({ ...tract, needScore: relativeNeedScore(tract.rawValue, min, max, metric.inverse) })).sort((a, b) => b.needScore - a.needScore);
+  }
+
+  function priorityTracts(census, orgs, metricKey) {
     const mapped = orgs.filter(hasCoords);
-    return allTracts(census).map(tract => {
-      const distances = mapped.map(org => distanceMiles(tract.center[0], tract.center[1], Number(org.lat), Number(org.lng))).filter(Number.isFinite).sort((a, b) => a - b);
-      const assetCount = distances.filter(d => d <= 10).length;
-      const priority = Math.max(0, Math.min(100, Math.round(tract.need + (assetCount === 0 ? 25 : assetCount <= 2 ? 12 : 0))));
+    return allTracts(census, metricKey).map(tract => {
+      const distances = mapped.map(org => ({ org, miles: distanceMiles(tract.center[0], tract.center[1], Number(org.lat), Number(org.lng)) }))
+        .filter(item => Number.isFinite(item.miles))
+        .sort((a, b) => a.miles - b.miles);
+      const nearby = distances.filter(item => item.miles <= 10);
+      const assetCount = nearby.length;
+      const scarcityBonus = assetCount === 0 ? 25 : assetCount <= 2 ? 12 : assetCount <= 4 ? 6 : 0;
+      const priority = Math.max(0, Math.min(100, Math.round(tract.needScore + scarcityBonus)));
       return { ...tract, assetCount, closest: distances[0], priority };
-    }).sort((a, b) => b.priority - a.priority || a.assetCount - b.assetCount);
+    }).sort((a, b) => b.priority - a.priority || a.assetCount - b.assetCount || b.needScore - a.needScore);
   }
 
   function centerOf(geometry = {}) {
@@ -341,8 +401,27 @@
     return section(title, items.length ? table(headers, items.slice(0, 30).map(mapper)) : '<p class="muted">No issues found in this category.</p>');
   }
 
-  function tractTable(tracts) {
-    return tracts.length ? table(['Tract', 'Population', 'Need score', 'Priority', 'Assets within 10 mi', 'Closest asset'], tracts.map(t => [t.name, t.population || 'n/a', t.need || 'n/a', t.priority, t.assetCount, t.closest == null ? 'None mapped' : `${t.closest.toFixed(1)} mi`])) : '<p class="muted">No census tract data available.</p>';
+  function tractTable(tracts, metricKey) {
+    const metric = censusMetrics[metricKey] || censusMetrics.compositePovertyNoVehicle;
+    return tracts.length ? table(['Tract', 'Population', metric.label, 'Relative need score', 'Priority score', 'Matching assets within 10 mi', 'Closest matching asset'], tracts.map(t => [
+      t.name,
+      formatPopulation(t.population),
+      formatMetricValue(t.rawValue, metricKey),
+      `${Math.round(t.needScore)} / 100`,
+      `${t.priority} / 100`,
+      t.assetCount,
+      t.closest ? `${t.closest.org.name || 'Unnamed organization'} (${t.closest.miles.toFixed(1)} mi)` : 'None mapped'
+    ])) : '<p class="muted">No census tract data available for the selected need layer.</p>';
+  }
+
+  function tractNeedOnlyTable(tracts, metricKey) {
+    const metric = censusMetrics[metricKey] || censusMetrics.compositePovertyNoVehicle;
+    return tracts.length ? table(['Tract', 'Population', metric.label, 'Relative need score'], tracts.map(t => [
+      t.name,
+      formatPopulation(t.population),
+      formatMetricValue(t.rawValue, metricKey),
+      `${Math.round(t.needScore)} / 100`
+    ])) : '<p class="muted">No census tract data available for the selected need layer.</p>';
   }
 
   function section(title, body) {
@@ -437,6 +516,40 @@
       if (ids.has(rel.toOrgId)) degrees.set(rel.toOrgId, (degrees.get(rel.toOrgId) || 0) + 1);
     });
     return degrees;
+  }
+
+  function tractLabel(props = {}) {
+    const value = String(props.TRACT || props.NAME || props.GEOID || props.geoid || '').replace('Census Tract ', '');
+    if (!value) return 'Unknown tract';
+    return `Census Tract ${value.replace(/^0+/, '').replace(/(\d{2})$/, '.$1').replace('.00', '')}`;
+  }
+
+  function relativeNeedScore(value, min, max, inverse) {
+    if (![value, min, max].every(v => Number.isFinite(Number(v)))) return 0;
+    const span = Math.max(0.0001, Number(max) - Number(min));
+    let score = ((Number(value) - Number(min)) / span) * 100;
+    if (inverse) score = 100 - score;
+    return Math.max(0, Math.min(100, score));
+  }
+
+  function firstNumber(...values) {
+    for (const value of values) {
+      const n = Number(value);
+      if (Number.isFinite(n)) return n;
+    }
+    return null;
+  }
+
+  function formatPopulation(value) {
+    return Number.isFinite(Number(value)) ? Math.round(Number(value)).toLocaleString() : 'No data';
+  }
+
+  function formatMetricValue(value, metricKey) {
+    if (!Number.isFinite(Number(value))) return 'No data';
+    const metric = censusMetrics[metricKey] || censusMetrics.compositePovertyNoVehicle;
+    if (metric.prefix) return `${metric.prefix}${Math.round(Number(value)).toLocaleString()}`;
+    if (metric.suffix?.includes('/ 100')) return `${Math.round(Number(value))}${metric.suffix}`;
+    return `${Number(value).toFixed(1)}${metric.suffix || ''}`;
   }
 
   function cleanNumber(value) {
