@@ -10,6 +10,7 @@
     loadStartHereHelper();
     loadOrgTypeHelper();
     loadFocusTagHelper();
+    loadCompactListHelper();
     loadReportsHelper();
     updateBackButton();
   });
@@ -79,6 +80,10 @@
     loadScriptOnce('js/org-focus-tags.js', 'data-convene-focus-tags', '__conveneOrgFocusTagsLoaded');
     loadScriptOnce('js/org-tag-clickfix.js', 'data-convene-focus-clickfix', '__conveneOrgTagClickFixLoaded');
     loadScriptOnce('js/focus-tag-cleanup.js', 'data-convene-focus-cleanup', '__conveneFocusTagCleanupLoaded');
+  }
+
+  function loadCompactListHelper() {
+    loadScriptOnce('js/compact-list-style.js', 'data-convene-compact-list-style', '__conveneCompactListStyleLoaded');
   }
 
   function loadReportsHelper() {
@@ -162,7 +167,7 @@
   }
 
   function cssEscape(value) {
-    if (window.CSS?.escape) return window.CSS.escape(value);
+    if (window.CSS?.escape) return CSS.escape(value);
     return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   }
 })();
