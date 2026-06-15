@@ -106,13 +106,36 @@
       </section>
 
       <section id="mapView" class="view">
-        <div class="section-header"><div><h2>Ecosystem Map</h2><p>County-specific map center, organization points, and simple service filters.</p></div></div>
-        <div class="card map-controls">
-          <select id="mapTypeFilter"><option value="">All service types</option></select>
-          <label class="checkline"><input id="mapHeatToggle" type="checkbox" /> Heat layer</label>
-          <span id="mapStatus" class="muted"></span>
+        <div class="section-header">
+          <div><h2>Ecosystem Map</h2><p>Filter organizations, inspect map coverage, find missing coordinates, and review ecosystem structure.</p></div>
+          <div class="small-actions"><button id="mapFitBtn">Fit visible</button><button id="mapResetBtn">Reset filters</button></div>
         </div>
-        <div id="map" class="map"></div>
+
+        <div class="card map-controls-v2">
+          <label>Search<input id="mapSearchBox" type="search" placeholder="Search mapped ecosystem records..." /></label>
+          <label>Service type<select id="mapTypeFilter"><option value="">All service types</option></select></label>
+          <label>Reach<select id="mapReachFilter"><option value="">All reach levels</option></select></label>
+          <label>Confidence<select id="mapConfidenceFilter"><option value="">All confidence levels</option></select></label>
+          <label>Status<select id="mapStatusFilter"><option value="">All statuses</option></select></label>
+          <div class="map-toggle-stack">
+            <label class="checkline"><input id="mapHeatToggle" type="checkbox" /> Heat layer</label>
+            <label class="checkline"><input id="mapRelationshipToggle" type="checkbox" /> Relationships</label>
+            <label class="checkline"><input id="mapMissingOnlyToggle" type="checkbox" /> Missing coords only</label>
+          </div>
+        </div>
+
+        <div class="ecosystem-layout">
+          <div>
+            <div id="map" class="map"></div>
+            <p id="mapStatus" class="muted map-status-line"></p>
+          </div>
+          <aside class="ecosystem-panel">
+            <div class="card"><h3>Ecosystem summary</h3><div id="mapSummaryPanel"></div></div>
+            <div class="card"><h3>Breakdowns</h3><div id="mapBreakdownPanel"></div></div>
+            <div class="card"><h3>Visible mapped organizations</h3><div id="mapOrgList" class="map-list"></div></div>
+            <div class="card"><h3>Missing coordinates</h3><div id="mapMissingList" class="map-list"></div></div>
+          </aside>
+        </div>
       </section>
 
       <section id="censusView" class="view">
