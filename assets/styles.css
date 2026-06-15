@@ -70,6 +70,38 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
 #csvPreview th, #csvPreview td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
 .notice { border-left: 5px solid var(--brand); background: #fff; padding: 12px 14px; border-radius: 12px; }
 .muted { color: var(--muted); }
+.small { font-size: 12px; }
+.census-note { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--brand); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; margin-bottom: 14px; line-height: 1.35; }
+.census-toolbar { display: grid; grid-template-columns: repeat(6, minmax(150px, 1fr)); gap: 10px; align-items: end; margin-bottom: 14px; }
+.census-toolbar label { font-size: 12px; color: var(--muted); }
+.census-toolbar small { display: block; min-height: 30px; font-weight: 400; line-height: 1.25; color: var(--muted); }
+.census-layout { display: grid; grid-template-columns: 1fr 380px; gap: 14px; }
+.census-map { height: 670px; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #e5e7eb; box-shadow: var(--shadow); }
+.census-sidepanel { display: grid; gap: 14px; align-content: start; max-height: 670px; overflow: auto; padding-right: 4px; }
+.mini-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.mini-metric { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: #fff; }
+.mini-metric span { display: block; color: var(--muted); font-size: 12px; }
+.mini-metric b { display: block; font-size: 22px; color: var(--brand-dark); margin-top: 4px; }
+.warning { border-left: 4px solid var(--brand); background: var(--accent-red); padding: 8px 10px; border-radius: 10px; margin: 10px 0; color: var(--brand-dark); font-weight: 700; }
+.question-list { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.35; }
+.gap-row { width: 100%; border: 1px solid var(--line); border-left: 5px solid var(--brand); border-radius: 12px; padding: 10px; margin: 10px 0; background: white; text-align: left; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.gap-row:hover, .gap-row.active { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(40,39,40,.13); border-color: #111827; }
+.gap-row b { color: var(--brand-dark); }
+.score { display: inline-block; color: white; background: #111827; padding: 3px 7px; border-radius: 999px; font-size: 12px; font-weight: 800; margin: 5px 4px 0 0; }
+.pill { display: inline-block; font-size: 12px; padding: 3px 7px; border-radius: 999px; background: var(--accent-red); color: var(--brand-dark); font-weight: 800; margin: 5px 4px 0 0; }
+.legend-box { background: rgba(255,255,255,.96); border: 1px solid rgba(0,0,0,.18); border-radius: 12px; padding: 10px; font-size: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.18); max-width: 270px; line-height: 1.35; }
+.legend-swatch { display: inline-block; width: 13px; height: 13px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; border: 1px solid rgba(0,0,0,.18); background: #b91c1c; }
+.legend-swatch.dark { background: #7f1d1d; }
+.legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 999px; margin-right: 7px; vertical-align: -1px; background: var(--brand); border: 2px solid white; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.legend-line { display: inline-block; width: 24px; height: 0; margin-right: 6px; vertical-align: middle; border-top: 3px dashed #111827; }
+.org-marker { width: 16px; height: 16px; border-radius: 999px; background: var(--brand); border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.4); }
+.tract-label { background: rgba(255,255,255,.88); border: 1px solid rgba(127,29,29,.45); border-radius: 999px; color: #4b1111; font-weight: 800; font-size: 12px; padding: 2px 6px; box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+@media (max-width: 1180px) {
+  .census-toolbar { grid-template-columns: repeat(3, minmax(160px, 1fr)); }
+  .census-layout { grid-template-columns: 1fr; }
+  .census-map { height: 560px; }
+  .census-sidepanel { max-height: none; }
+}
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; gap: 6px; }
@@ -77,4 +109,7 @@ menu { display: flex; justify-content: flex-end; gap: 10px; padding: 0; margin: 
   .metrics, .two-col, .filters, .three-filter, .form-grid { grid-template-columns: 1fr; }
   .record-item, .task-item { grid-template-columns: 1fr; }
   .task-item small { grid-column: auto; }
+  .census-toolbar { grid-template-columns: 1fr; }
+  .census-map { height: 520px; }
+  .mini-metric-grid { grid-template-columns: 1fr; }
 }
