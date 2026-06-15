@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CONVENE Multi-County</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23c5050c'/%3E%3Ccircle cx='20' cy='22' r='5' fill='%23fff'/%3E%3Ccircle cx='44' cy='22' r='5' fill='%23fff'/%3E%3Ccircle cx='32' cy='43' r='6' fill='%23fff'/%3E%3Cpath d='M24.5 24.5 29 38M39.5 24.5 35 38M25 22h14' stroke='%23fff' stroke-width='4' stroke-linecap='round' opacity='.9'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>CONVENE</h1>
+      <p id="activeCountyLabel">Multi-county community asset mapping</p>
+    </div>
+    <div class="topbar-actions">
+      <label for="countySelect">County</label>
+      <select id="countySelect"></select>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar">
+      <button class="nav-btn active" data-view="dashboardView">Dashboard</button>
+      <button class="nav-btn" data-view="crmView">Organizations</button>
+      <button class="nav-btn" data-view="mapView">Map</button>
+      <button class="nav-btn" data-view="censusView">Census Gap Lens</button>
+      <button class="nav-btn" data-view="backupView">Backup / Restore</button>
+      <div class="sidebar-note">This edition keeps county settings and browser storage separated.</div>
+    </nav>
+
+    <main>
+      <section id="dashboardView" class="view active">
+        <h2>County Dashboard</h2>
+        <div class="grid metrics">
+          <article class="card"><span class="metric" id="orgCount">0</span><span>Organizations</span></article>
+          <article class="card"><span class="metric" id="typeCount">0</span><span>Service Types</span></article>
+          <article class="card"><span class="metric" id="mappedCount">0</span><span>Mapped Assets</span></article>
+          <article class="card"><span class="metric" id="activeCountyId">-</span><span>Active County</span></article>
+        </div>
+        <div class="card">
+          <h3>County profile</h3>
+          <p id="countySummary"></p>
+        </div>
+      </section>
+
+      <section id="crmView" class="view">
+        <div class="section-header">
+          <div><h2>Organizations</h2><p>Add, search, edit, and import county-specific organization records.</p></div>
+          <button id="addOrgBtn" class="primary">Add Organization</button>
+        </div>
+        <div class="card filters">
+          <input id="searchBox" type="search" placeholder="Search by name, type, focus, address, notes..." />
+          <select id="typeFilter"><option value="">All types</option></select>
+        </div>
+        <div id="orgList" class="org-list"></div>
+      </section>
+
+      <section id="mapView" class="view">
+        <div class="section-header"><div><h2>Asset Map</h2><p>County-specific map center, boundary, and organization points.</p></div></div>
+        <div id="map" class="map"></div>
+      </section>
+
+      <section id="censusView" class="view">
+        <div class="section-header"><div><h2>Census Gap Lens</h2><p>County-specific census files will drive tract-level signals here.</p></div></div>
+        <div id="censusPanel" class="card"></div>
+      </section>
+
+      <section id="backupView" class="view">
+        <h2>Backup / Restore</h2>
+        <div class="grid two-col">
+          <div class="card">
+            <h3>Export county backup</h3>
+            <p>Exports only the active county's organization records.</p>
+            <button id="exportBtn" class="primary">Download Backup</button>
+          </div>
+          <div class="card">
+            <h3>Restore county backup</h3>
+            <p>The app warns you if a backup appears to belong to another county.</p>
+            <input id="restoreFile" type="file" accept="application/json" />
+          </div>
+        </div>
+        <div class="card">
+          <h3>CSV import preview</h3>
+          <p>Append new records from CSV after reviewing the parsed preview.</p>
+          <input id="csvFile" type="file" accept=".csv,text/csv" />
+          <div id="csvPreview"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="orgDialog">
+    <form method="dialog" id="orgForm">
+      <h3 id="dialogTitle">Organization</h3>
+      <input type="hidden" id="orgId" />
+      <div class="form-grid">
+        <label>Name<input id="name" required /></label>
+        <label>Type<input id="type" placeholder="Food Security, Housing, Aging / Disability..." /></label>
+        <label>Status<select id="status"><option>Active</option><option>Research only</option><option>Inactive</option></select></label>
+        <label>Reach<select id="reach"><option>Countywide</option><option>Municipal</option><option>Neighborhood</option><option>Regional</option></select></label>
+        <label>Confidence<select id="confidence"><option>High</option><option>Medium</option><option>Low</option></select></label>
+        <label>Phone<input id="phone" /></label>
+        <label>Website<input id="website" /></label>
+        <label>Email<input id="email" /></label>
+        <label class="full">Address<input id="address" /></label>
+        <label>Latitude<input id="lat" type="number" step="any" /></label>
+        <label>Longitude<input id="lng" type="number" step="any" /></label>
+        <label class="full">Focus / Tags<input id="focus" /></label>
+        <label class="full">Mission / Description<textarea id="mission"></textarea></label>
+        <label class="full">Notes<textarea id="notes"></textarea></label>
+      </div>
+      <menu>
+        <button value="cancel">Cancel</button>
+        <button id="saveOrgBtn" value="default" class="primary">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/county-config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/access.js"></script>
+  <script src="js/crm.js"></script>
+  <script src="js/census-gap.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
