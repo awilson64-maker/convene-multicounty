@@ -1,0 +1,8 @@
+# Local editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Do not commit private local exports or county backup files
+*backup*.json
+*access-key*.json
