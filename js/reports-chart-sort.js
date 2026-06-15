@@ -2,6 +2,14 @@
   if (window.__conveneReportsChartSortLoaded) return;
   window.__conveneReportsChartSortLoaded = true;
 
+  function installPolishStyles() {
+    if (document.getElementById('reportsCalloutPolishStyles')) return;
+    var style = document.createElement('style');
+    style.id = 'reportsCalloutPolishStyles';
+    style.textContent = '.report-callout b:first-child { font-weight: 400; }';
+    document.head.appendChild(style);
+  }
+
   function numberFromRow(row) {
     var strong = row.querySelector('b');
     if (!strong) return 0;
@@ -31,8 +39,12 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', sortReportCharts);
+    document.addEventListener('DOMContentLoaded', function () {
+      installPolishStyles();
+      sortReportCharts();
+    });
   } else {
+    installPolishStyles();
     sortReportCharts();
   }
 
