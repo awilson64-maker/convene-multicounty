@@ -73,6 +73,7 @@
 
   function loadReportsHelper() {
     loadScriptOnce('js/reports-v2.js', 'data-convene-reports', '__conveneReportsV2Loaded');
+    loadScriptOnce('js/reports-gap-action-priority.js', 'data-convene-gap-action-priority', '__conveneGapActionPriorityLoaded');
     loadScriptOnce('js/reports-fallback.js', 'data-convene-reports-fallback', '__conveneReportFallbackLoaded');
     loadScriptOnce('js/reports-need-layer.js', 'data-convene-reports-need-layer', '__conveneReportsNeedLayerLoaded');
   }
