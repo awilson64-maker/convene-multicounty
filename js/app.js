@@ -3,7 +3,10 @@
   let workspace = emptyWorkspace();
   let map;
   let markers = [];
+  let relationshipLayers = [];
   let heatLayer = null;
+  let markerByOrgId = new Map();
+  let lastMapCountyId = '';
 
   const $ = id => document.getElementById(id);
   const today = () => new Date().toISOString().slice(0, 10);
@@ -39,6 +42,7 @@
     $('countySelect').value = activeCounty.id;
     $('activeCountyLabel').textContent = `${activeCounty.name} | Multi-county community asset mapping`;
     workspace = normalizeWorkspace(ConveneStorage.loadWorkspace(activeCounty));
+    lastMapCountyId = '';
     renderAll();
   }
 
@@ -86,8 +90,11 @@
     $('relationshipSearchBox').addEventListener('input', renderRelationshipList);
     $('relationshipStatusFilter').addEventListener('change', renderRelationshipList);
 
-    $('mapTypeFilter').addEventListener('change', renderMap);
-    $('mapHeatToggle').addEventListener('change', renderMap);
+    ['mapTypeFilter', 'mapReachFilter', 'mapConfidenceFilter', 'mapStatusFilter'].forEach(id => $(id)?.addEventListener('change', renderMap));
+    ['mapHeatToggle', 'mapRelationshipToggle', 'mapMissingOnlyToggle'].forEach(id => $(id)?.addEventListener('change', renderMap));
+    $('mapSearchBox')?.addEventListener('input', renderMap);
+    $('mapResetBtn')?.addEventListener('click', resetMapFilters);
+    $('mapFitBtn')?.addEventListener('click', fitVisibleMapFeatures);
 
     $('exportBtn').addEventListener('click', exportBackup);
     $('restoreFile').addEventListener('change', restoreBackup);
@@ -104,7 +111,7 @@
     renderActivityList();
     renderRelationshipStatusFilter();
     renderRelationshipList();
-    renderMapTypeFilter();
+    renderMapFilters();
     renderMap();
     ConveneCensus.renderCountyCensus(activeCounty, $('censusPanel'));
   }
@@ -157,12 +164,14 @@
           <div class="record-meta">${escapeHtml(org.reach || 'No reach')} | Confidence: ${escapeHtml(org.confidence || 'Not set')}</div>
         </div>
         <div class="small-actions">
+          ${hasCoordinates(org) ? `<button data-map-org="${org.id}">Map</button>` : ''}
           <button data-edit-org="${org.id}">Edit</button>
           <button class="danger" data-delete-org="${org.id}">Delete</button>
         </div>
       </article>`).join('');
     list.querySelectorAll('[data-edit-org]').forEach(btn => btn.addEventListener('click', () => openOrgDialog(btn.dataset.editOrg)));
     list.querySelectorAll('[data-delete-org]').forEach(btn => btn.addEventListener('click', () => deleteOrg(btn.dataset.deleteOrg)));
+    list.querySelectorAll('[data-map-org]').forEach(btn => btn.addEventListener('click', () => { showView('mapView'); setTimeout(() => zoomToOrg(btn.dataset.mapOrg), 80); }));
   }
 
   function openOrgDialog(id) {
@@ -465,8 +474,31 @@
     persistAndRender();
   }
 
-  function renderMapTypeFilter() {
+  function renderMapFilters() {
     setSelectOptions($('mapTypeFilter'), unique(workspace.organizations.map(o => o.type)), 'All service types');
+    setSelectOptions($('mapReachFilter'), unique(workspace.organizations.map(o => o.reach)), 'All reach levels');
+    setSelectOptions($('mapConfidenceFilter'), unique(workspace.organizations.map(o => o.confidence)), 'All confidence levels');
+    setSelectOptions($('mapStatusFilter'), unique(workspace.organizations.map(o => o.status)), 'All statuses');
+  }
+
+  function filteredMapOrgs() {
+    const type = $('mapTypeFilter')?.value || '';
+    const reach = $('mapReachFilter')?.value || '';
+    const confidence = $('mapConfidenceFilter')?.value || '';
+    const status = $('mapStatusFilter')?.value || '';
+    const term = ($('mapSearchBox')?.value || '').toLowerCase().trim();
+    const missingOnly = Boolean($('mapMissingOnlyToggle')?.checked);
+    return workspace.organizations
+      .filter(org => {
+        const matches = (!type || org.type === type)
+          && (!reach || org.reach === reach)
+          && (!confidence || org.confidence === confidence)
+          && (!status || org.status === status)
+          && (!term || haystack(org).includes(term))
+          && (!missingOnly || !hasCoordinates(org));
+        return matches;
+      })
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
   }
 
   function renderMap() {
@@ -480,28 +512,221 @@
       map = L.map('map');
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
     }
-    map.setView(activeCounty.mapCenter, activeCounty.mapZoom);
-    markers.forEach(marker => marker.remove());
-    markers = [];
-    if (heatLayer) { heatLayer.remove(); heatLayer = null; }
-
-    const type = $('mapTypeFilter')?.value || '';
-    const mapped = workspace.organizations.filter(org => {
-      const lat = Number(org.lat), lng = Number(org.lng);
-      return Number.isFinite(lat) && Number.isFinite(lng) && (!type || org.type === type);
-    });
-
-    mapped.forEach(org => {
-      const marker = L.marker([Number(org.lat), Number(org.lng)]).addTo(map).bindPopup(`<strong>${escapeHtml(org.name)}</strong><br>${escapeHtml(org.type || '')}<br>${escapeHtml(org.address || '')}`);
-      markers.push(marker);
-    });
-
-    if ($('mapHeatToggle')?.checked && window.L.heatLayer && mapped.length) {
-      heatLayer = L.heatLayer(mapped.map(org => [Number(org.lat), Number(org.lng), 0.65]), { radius: 28 }).addTo(map);
+    if (lastMapCountyId !== activeCounty.id) {
+      map.setView(activeCounty.mapCenter, activeCounty.mapZoom);
+      lastMapCountyId = activeCounty.id;
     }
 
-    $('mapStatus').textContent = `${mapped.length} mapped organization${mapped.length === 1 ? '' : 's'} shown.`;
-    setTimeout(() => map.invalidateSize(), 100);
+    clearMapLayers();
+
+    const filtered = filteredMapOrgs();
+    const mapped = filtered.filter(hasCoordinates);
+    const missing = filtered.filter(org => !hasCoordinates(org));
+    markerByOrgId = new Map();
+
+    if (!$('mapMissingOnlyToggle')?.checked) {
+      mapped.forEach(org => {
+        const marker = L.marker([Number(org.lat), Number(org.lng)])
+          .addTo(map)
+          .bindPopup(orgPopupHtml(org));
+        markers.push(marker);
+        markerByOrgId.set(org.id, marker);
+      });
+    }
+
+    if ($('mapHeatToggle')?.checked && window.L.heatLayer && mapped.length) {
+      heatLayer = L.heatLayer(mapped.map(org => [Number(org.lat), Number(org.lng), 0.65]), { radius: 30, blur: 22, maxZoom: 13 }).addTo(map);
+    }
+
+    if ($('mapRelationshipToggle')?.checked) drawRelationshipLines(mapped);
+
+    renderMapInsights(filtered, mapped, missing);
+    renderMapOrgList(filtered, mapped, missing);
+    renderMapBreakdowns(filtered);
+
+    const typeLabel = $('mapTypeFilter')?.value ? ` for ${$('mapTypeFilter').value}` : '';
+    $('mapStatus').textContent = `${mapped.length} mapped organization${mapped.length === 1 ? '' : 's'} shown${typeLabel}. ${missing.length} filtered record${missing.length === 1 ? '' : 's'} missing coordinates.`;
+
+    setTimeout(() => {
+      map.invalidateSize();
+      window.ConveneCountyBoundary?.draw?.();
+    }, 100);
+  }
+
+  function clearMapLayers() {
+    markers.forEach(marker => marker.remove());
+    markers = [];
+    relationshipLayers.forEach(layer => layer.remove());
+    relationshipLayers = [];
+    if (heatLayer) { heatLayer.remove(); heatLayer = null; }
+  }
+
+  function drawRelationshipLines(mappedOrgs) {
+    const visibleIds = new Set(mappedOrgs.map(org => org.id));
+    const byId = new Map(workspace.organizations.map(org => [org.id, org]));
+    workspace.relationships.forEach(rel => {
+      if (!visibleIds.has(rel.fromOrgId) || !visibleIds.has(rel.toOrgId)) return;
+      const a = byId.get(rel.fromOrgId);
+      const b = byId.get(rel.toOrgId);
+      if (!hasCoordinates(a) || !hasCoordinates(b)) return;
+      const line = L.polyline([[Number(a.lat), Number(a.lng)], [Number(b.lat), Number(b.lng)]], {
+        color: relationshipColor(rel.strength),
+        weight: rel.strength === 'Strong' ? 4 : rel.strength === 'Weak' ? 2 : 3,
+        opacity: 0.75,
+        dashArray: rel.status === 'Potential' ? '6 6' : null
+      }).addTo(map).bindPopup(`<strong>${escapeHtml(orgName(rel.fromOrgId))} ↔ ${escapeHtml(orgName(rel.toOrgId))}</strong><br>${escapeHtml(rel.status)} | ${escapeHtml(rel.strength)}<br>${escapeHtml(rel.summary || rel.notes || '')}`);
+      relationshipLayers.push(line);
+    });
+  }
+
+  function relationshipColor(strength) {
+    if (strength === 'Strong') return '#166534';
+    if (strength === 'Weak') return '#92400e';
+    return '#111827';
+  }
+
+  function renderMapInsights(filtered, mapped, missing) {
+    const all = workspace.organizations;
+    const researchOnly = filtered.filter(org => /research/i.test(org.status || '')).length;
+    const active = filtered.filter(org => /active|met|collaboration/i.test(org.status || '')).length;
+    const relationshipCount = visibleRelationshipCount(mapped);
+    const panel = $('mapSummaryPanel');
+    if (!panel) return;
+    panel.innerHTML = `
+      <div class="mini-metric-grid map-metrics">
+        <div class="mini-metric"><span>Total county records</span><b>${all.length}</b></div>
+        <div class="mini-metric"><span>Filtered records</span><b>${filtered.length}</b></div>
+        <div class="mini-metric"><span>Mapped records</span><b>${mapped.length}</b></div>
+        <div class="mini-metric"><span>Missing coordinates</span><b>${missing.length}</b></div>
+        <div class="mini-metric"><span>Research-only</span><b>${researchOnly}</b></div>
+        <div class="mini-metric"><span>Visible relationships</span><b>${relationshipCount}</b></div>
+      </div>
+      <p class="muted small">${active} filtered records are active, met, or active collaboration. Use this panel to clean the dataset before presenting the ecosystem publicly.</p>`;
+  }
+
+  function visibleRelationshipCount(mapped) {
+    const ids = new Set(mapped.map(org => org.id));
+    return workspace.relationships.filter(rel => ids.has(rel.fromOrgId) && ids.has(rel.toOrgId)).length;
+  }
+
+  function renderMapBreakdowns(filtered) {
+    const panel = $('mapBreakdownPanel');
+    if (!panel) return;
+    const typeCounts = countBy(filtered, org => org.type || 'No type');
+    const reachCounts = countBy(filtered, org => org.reach || 'No reach');
+    const confidenceCounts = countBy(filtered, org => org.confidence || 'No confidence');
+    panel.innerHTML = `
+      <div class="breakdown-grid">
+        ${breakdownHtml('By service type', typeCounts)}
+        ${breakdownHtml('By reach', reachCounts)}
+        ${breakdownHtml('By confidence', confidenceCounts)}
+      </div>`;
+  }
+
+  function breakdownHtml(title, entries) {
+    const rows = entries.slice(0, 8).map(([label, count]) => `
+      <div class="breakdown-row"><span>${escapeHtml(label)}</span><b>${count}</b></div>`).join('');
+    return `<section><h4>${escapeHtml(title)}</h4>${rows || '<p class="muted small">No records in current filter.</p>'}</section>`;
+  }
+
+  function countBy(items, getter) {
+    const map = new Map();
+    items.forEach(item => {
+      const key = String(getter(item) || '').trim() || 'Blank';
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+
+  function renderMapOrgList(filtered, mapped, missing) {
+    const list = $('mapOrgList');
+    const missingList = $('mapMissingList');
+    if (!list || !missingList) return;
+
+    const mappedIds = new Set(mapped.map(org => org.id));
+    const mappedRows = filtered.filter(org => mappedIds.has(org.id));
+    list.innerHTML = mappedRows.length ? mappedRows.map(org => `
+      <article class="map-list-item">
+        <div>
+          <strong>${escapeHtml(org.name || 'Unnamed organization')}</strong>
+          <span>${escapeHtml(org.type || 'No type')} | ${escapeHtml(org.status || 'No status')}</span>
+          <small>${escapeHtml(org.address || 'No address')}</small>
+        </div>
+        <div class="small-actions">
+          <button data-zoom-org="${org.id}">Zoom</button>
+          <button data-edit-org="${org.id}">Edit</button>
+        </div>
+      </article>`).join('') : '<p class="muted">No mapped organizations match the current filters.</p>';
+
+    missingList.innerHTML = missing.length ? missing.map(org => `
+      <article class="map-list-item missing-coords">
+        <div>
+          <strong>${escapeHtml(org.name || 'Unnamed organization')}</strong>
+          <span>${escapeHtml(org.type || 'No type')} | ${escapeHtml(org.address || 'No address')}</span>
+        </div>
+        <div class="small-actions"><button data-edit-org="${org.id}">Add lat/lng</button></div>
+      </article>`).join('') : '<p class="muted">No missing coordinates in the current filters.</p>';
+
+    [list, missingList].forEach(container => {
+      container.querySelectorAll('[data-zoom-org]').forEach(btn => btn.addEventListener('click', () => zoomToOrg(btn.dataset.zoomOrg)));
+      container.querySelectorAll('[data-edit-org]').forEach(btn => btn.addEventListener('click', () => openOrgDialog(btn.dataset.editOrg)));
+    });
+  }
+
+  function orgPopupHtml(org) {
+    const contacts = workspace.contacts.filter(contact => contact.organizationId === org.id).slice(0, 3);
+    const activities = workspace.activities.filter(activity => activity.organizationIds.includes(org.id)).slice(0, 3);
+    const relationships = workspace.relationships.filter(rel => rel.fromOrgId === org.id || rel.toOrgId === org.id).slice(0, 3);
+    const contactHtml = contacts.length ? contacts.map(c => `${escapeHtml(c.name || 'Unnamed contact')}${c.role ? `, ${escapeHtml(c.role)}` : ''}`).join('<br>') : 'No linked contacts';
+    const activityHtml = activities.length ? activities.map(a => `${escapeHtml(formatDate(a.date))}: ${escapeHtml(a.summary || a.type)}`).join('<br>') : 'No logged activities';
+    const relationshipHtml = relationships.length ? relationships.map(r => `${escapeHtml(orgName(r.fromOrgId === org.id ? r.toOrgId : r.fromOrgId))} (${escapeHtml(r.status)})`).join('<br>') : 'No mapped relationships';
+    const website = normalizeUrl(org.website);
+    return `
+      <div class="popup-card">
+        <strong>${escapeHtml(org.name || 'Unnamed organization')}</strong>
+        <div>${escapeHtml(org.type || 'No type')} | ${escapeHtml(org.status || 'No status')}</div>
+        <div>Reach: ${escapeHtml(org.reach || 'Not set')} | Confidence: ${escapeHtml(org.confidence || 'Not set')}</div>
+        <hr>
+        <div>${escapeHtml(org.address || 'No address')}</div>
+        ${org.phone ? `<div>Phone: ${escapeHtml(org.phone)}</div>` : ''}
+        ${org.email ? `<div>Email: ${escapeHtml(org.email)}</div>` : ''}
+        ${website ? `<div><a href="${escapeHtml(website)}" target="_blank" rel="noopener">Website</a></div>` : ''}
+        ${org.focus ? `<div><b>Focus:</b> ${escapeHtml(org.focus)}</div>` : ''}
+        <hr>
+        <div><b>Contacts</b><br>${contactHtml}</div>
+        <div><b>Recent activity</b><br>${activityHtml}</div>
+        <div><b>Relationships</b><br>${relationshipHtml}</div>
+      </div>`;
+  }
+
+  function zoomToOrg(id) {
+    const org = workspace.organizations.find(o => o.id === id);
+    if (!org || !hasCoordinates(org) || !map) return;
+    map.setView([Number(org.lat), Number(org.lng)], Math.max(map.getZoom(), 14));
+    const marker = markerByOrgId.get(id);
+    if (marker) marker.openPopup();
+  }
+
+  function fitVisibleMapFeatures() {
+    if (!map) return;
+    const mapped = filteredMapOrgs().filter(hasCoordinates);
+    if (!mapped.length) {
+      map.setView(activeCounty.mapCenter, activeCounty.mapZoom);
+      return;
+    }
+    const bounds = L.latLngBounds(mapped.map(org => [Number(org.lat), Number(org.lng)]));
+    map.fitBounds(bounds.pad(0.2));
+  }
+
+  function resetMapFilters() {
+    ['mapTypeFilter', 'mapReachFilter', 'mapConfidenceFilter', 'mapStatusFilter'].forEach(id => { if ($(id)) $(id).value = ''; });
+    if ($('mapSearchBox')) $('mapSearchBox').value = '';
+    if ($('mapMissingOnlyToggle')) $('mapMissingOnlyToggle').checked = false;
+    renderMap();
+  }
+
+  function hasCoordinates(org) {
+    return Number.isFinite(Number(org?.lat)) && Number.isFinite(Number(org?.lng));
   }
 
   function exportBackup() {
@@ -576,6 +801,7 @@
   }
 
   function setSelectOptions(select, values, blankLabel) {
+    if (!select) return;
     const current = select.value;
     select.innerHTML = `<option value="">${escapeHtml(blankLabel || '')}</option>`;
     values.forEach(value => {
@@ -589,7 +815,7 @@
       }
       select.appendChild(opt);
     });
-    select.value = current;
+    select.value = [...select.options].some(option => option.value === current) ? current : '';
   }
 
   function populateOrgSelect(select, selected = '', includeBlank = true) {
@@ -654,6 +880,12 @@
 
   function normalizeKey(value) {
     return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  function normalizeUrl(value) {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    return /^https?:\/\//i.test(url) ? url : `https://${url}`;
   }
 
   function toArray(value) {
