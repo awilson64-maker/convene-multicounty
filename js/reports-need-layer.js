@@ -115,9 +115,9 @@
       } else {
         body = `
           ${metricSection([['Relevant orgs', orgs.length], ['Mapped matching assets', mappedAssets.length], ['Census tracts', all.length], ['Priority tracts shown', tracts.length], ['No nearby matching assets', tracts.filter(t => t.assetCount === 0).length], ['Activities', activities.length]])}
-          ${section('Geographic access readout', `<p>This report compares tract-level need signals with mapped assets matching <b>${escapeHtml(settings.focusTag || settings.serviceType)}</b>. The selected Census need layer is <b>${escapeHtml(metric.label)}</b>. Treat high-priority tracts as planning signals for follow-up, not as proof that no service exists.</p>`)}
+          ${section('Geographic access readout', `<p>This report compares tract-level need signals with mapped assets matching <b>${escapeHtml(settings.focusTag || settings.serviceType)}</b>. The selected Census need layer is <b>${escapeHtml(metric.label)}</b>. The final gap priority now combines <b>relative need</b> with an <b>access gap score</b>, so nearby matching assets reduce the final priority.</p>`)}
           ${section('Priority tract table', tractTable(tracts, selectedMetric))}
-          ${checked('reportCharts') ? section('Gap visuals', `<div class="chart-grid">${barChart('Priority score', tracts.map(t => [t.name, t.priority]), 12)}${barChart('Matching assets within 10 miles', tracts.map(t => [t.name, t.assetCount]), 12)}</div>`) : ''}
+          ${checked('reportCharts') ? section('Gap visuals', `<div class="chart-grid">${barChart('Final gap priority', tracts.map(t => [t.name, t.priority]), 12)}${barChart('Access gap score', tracts.map(t => [t.name, t.accessGap]), 12)}</div>`) : ''}
           ${checked('reportOrgList') ? orgTable(mappedAssets, 'Mapped organizations used as matching assets') : ''}
           ${checked('reportActivities') ? activitySection(activities, data.organizations) : ''}`;
       }
@@ -130,7 +130,7 @@
           <span class="report-chip">${escapeHtml(scopeLabel(settings))}</span>
         </header>
         ${body}
-        <footer class="report-section"><p class="muted small">Generated from the active county workspace. The service/focus selection defines matching assets. The need layer defines the Census signal used for tract prioritization.</p></footer>
+        <footer class="report-section"><p class="muted small">Generated from the active county workspace. The service/focus selection defines matching assets. The need layer defines the Census signal. Final gap priority is weighted 60% relative need and 40% access gap.</p></footer>
       </article>`;
       output.innerHTML = state.lastGapHtml;
     } catch (err) {
@@ -265,10 +265,37 @@
         .sort((a, b) => a.miles - b.miles);
       const nearby = distances.filter(item => item.miles <= 10);
       const assetCount = nearby.length;
-      const scarcityBonus = assetCount === 0 ? 25 : assetCount <= 2 ? 12 : assetCount <= 4 ? 6 : 0;
-      const priority = Math.max(0, Math.min(100, Math.round(tract.needScore + scarcityBonus)));
-      return { ...tract, assetCount, closest: distances[0], priority };
-    }).sort((a, b) => b.priority - a.priority || a.assetCount - b.assetCount || b.needScore - a.needScore);
+      const closest = distances[0] || null;
+      const accessGap = accessGapScore(closest?.miles, assetCount);
+      const priority = Math.max(0, Math.min(100, Math.round((tract.needScore * 0.6) + (accessGap * 0.4))));
+      return { ...tract, assetCount, closest, accessGap, accessSignal: accessSignal(closest?.miles, assetCount), priority };
+    }).sort((a, b) => b.priority - a.priority || b.accessGap - a.accessGap || b.needScore - a.needScore);
+  }
+
+  function accessGapScore(closestMiles, assetCount) {
+    if (!Number.isFinite(Number(closestMiles))) return 100;
+    const d = Number(closestMiles);
+    let score;
+    if (d <= 1) score = 8;
+    else if (d <= 2) score = 18;
+    else if (d <= 5) score = 40;
+    else if (d <= 10) score = 65;
+    else score = 90;
+
+    if (assetCount >= 5) score -= 20;
+    else if (assetCount >= 3) score -= 12;
+    else if (assetCount >= 2) score -= 6;
+
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  function accessSignal(closestMiles, assetCount) {
+    if (!assetCount) return 'No matching assets within 10 mi';
+    const d = Number(closestMiles);
+    if (d <= 1) return 'Very close matching access';
+    if (d <= 2) return 'Close matching access';
+    if (d <= 5) return 'Moderate matching access';
+    return 'Distant matching access';
   }
 
   function metricSection(items) {
@@ -277,7 +304,7 @@
   function section(title, body) { return `<section class="report-section"><h2>${escapeHtml(title)}</h2>${body}</section>`; }
   function tractTable(tracts, metricKey) {
     const metric = metricOptions[metricKey] || metricOptions.compositePovertyNoVehicle;
-    return tracts.length ? table(['Tract', 'Population', metric.label, 'Relative need score', 'Priority score', 'Matching assets within 10 mi', 'Closest matching asset'], tracts.map(t => [t.name, formatPopulation(t.population), formatMetricValue(t.rawValue, metricKey), `${Math.round(t.needScore)} / 100`, `${t.priority} / 100`, t.assetCount, t.closest ? `${t.closest.org.name || 'Unnamed organization'} (${t.closest.miles.toFixed(1)} mi)` : 'None mapped'])) : '<p class="muted">No census tract data available for the selected need layer.</p>';
+    return tracts.length ? table(['Tract', 'Population', metric.label, 'Relative need', 'Access gap', 'Final gap priority', 'Access signal', 'Closest matching asset'], tracts.map(t => [t.name, formatPopulation(t.population), formatMetricValue(t.rawValue, metricKey), `${Math.round(t.needScore)} / 100`, `${t.accessGap} / 100`, `${t.priority} / 100`, t.accessSignal, t.closest ? `${t.closest.org.name || 'Unnamed organization'} (${t.closest.miles.toFixed(1)} mi)` : 'None mapped'])) : '<p class="muted">No census tract data available for the selected need layer.</p>';
   }
   function tractNeedOnlyTable(tracts, metricKey) {
     const metric = metricOptions[metricKey] || metricOptions.compositePovertyNoVehicle;
