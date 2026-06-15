@@ -8,6 +8,7 @@
     installBackButton();
     installNavigationTracker();
     loadFocusTagHelper();
+    loadReportsHelper();
     updateBackButton();
   });
 
@@ -61,6 +62,15 @@
     script.src = 'js/org-focus-tags.js';
     script.defer = true;
     script.dataset.conveneFocusTags = 'true';
+    document.body.appendChild(script);
+  }
+
+  function loadReportsHelper() {
+    if (document.querySelector('script[data-convene-reports]') || window.__conveneReportsLoaded) return;
+    const script = document.createElement('script');
+    script.src = 'js/reports.js';
+    script.defer = true;
+    script.dataset.conveneReports = 'true';
     document.body.appendChild(script);
   }
 
