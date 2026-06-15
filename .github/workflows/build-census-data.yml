@@ -1,0 +1,50 @@
+name: Build Multi-County Census Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      county:
+        description: County to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - fdl
+          - waupaca
+      acs_year:
+        description: ACS 5-year release year
+        required: true
+        default: '2024'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build census tract data
+        env:
+          ACS_YEAR: ${{ inputs.acs_year }}
+        run: node scripts/build-census-data.mjs ${{ inputs.county }}
+
+      - name: Commit updated data files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain data/)" ]]; then
+            git add data/fdl/census-tracts.json data/waupaca/census-tracts.json
+            git commit -m "Update county census tract data"
+            git push
+          else
+            echo "No census data changes to commit."
+          fi
