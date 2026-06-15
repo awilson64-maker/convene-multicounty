@@ -2,6 +2,31 @@
   if (window.__conveneOrgListControlsLoaded) return;
   window.__conveneOrgListControlsLoaded = true;
 
+  var STATUS_LABELS = [
+    'Active',
+    'Active collaboration',
+    'Contacted',
+    'Inactive',
+    'Meeting scheduled',
+    'Met',
+    'Not contacted',
+    'Research only'
+  ];
+
+  var STATUS_ALIASES = {
+    'active': 'Active',
+    'active collaboration': 'Active collaboration',
+    'collaboration': 'Active collaboration',
+    'contacted': 'Contacted',
+    'inactive': 'Inactive',
+    'meeting scheduled': 'Meeting scheduled',
+    'meeting': 'Meeting scheduled',
+    'met': 'Met',
+    'not contacted': 'Not contacted',
+    'research only': 'Research only',
+    'research': 'Research only'
+  };
+
   function init() {
     installStyles();
     installControls();
@@ -75,7 +100,7 @@
     var select = document.getElementById('orgStatusFilter');
     if (!select) return;
 
-    var previous = select.value || '';
+    var previous = canonicalStatus(select.value || '');
     var statuses = getOrganizationStatuses();
     var options = ['<option value="">All statuses</option>'];
     for (var i = 0; i < statuses.length; i += 1) {
@@ -91,14 +116,22 @@
   }
 
   function getOrganizationStatuses() {
-    var values = [];
+    var values = STATUS_LABELS.slice();
     var orgs = loadOrganizations();
     for (var i = 0; i < orgs.length; i += 1) {
-      var value = clean(orgs[i] && orgs[i].status);
+      var value = canonicalStatus(orgs[i] && orgs[i].status);
       if (value) values.push(value);
     }
-    values = values.concat(['Active', 'active collaboration', 'research only', 'inactive']);
-    return unique(values).sort(function (a, b) { return a.localeCompare(b); });
+    return unique(values).sort(statusSort);
+  }
+
+  function statusSort(a, b) {
+    var ai = STATUS_LABELS.indexOf(a);
+    var bi = STATUS_LABELS.indexOf(b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
   }
 
   function loadOrganizations() {
@@ -129,10 +162,10 @@
     var list = document.getElementById('orgList');
     if (!select || !list) return;
 
-    var selected = clean(select.value);
+    var selected = canonicalStatus(select.value);
     var rows = list.querySelectorAll('.record-item');
     for (var i = 0; i < rows.length; i += 1) {
-      var rowStatus = getRowStatus(rows[i]);
+      var rowStatus = canonicalStatus(getRowStatus(rows[i]));
       rows[i].style.display = (!selected || rowStatus === selected) ? '' : 'none';
     }
   }
@@ -145,11 +178,25 @@
     return clean(parts[1]);
   }
 
+  function canonicalStatus(value) {
+    var cleaned = clean(value);
+    if (!cleaned) return '';
+    var key = cleaned.toLowerCase();
+    if (STATUS_ALIASES[key]) return STATUS_ALIASES[key];
+    return toTitleCase(cleaned);
+  }
+
+  function toTitleCase(value) {
+    return clean(value).toLowerCase().replace(/\b\w/g, function (letter) {
+      return letter.toUpperCase();
+    });
+  }
+
   function unique(values) {
     var seen = {};
     var out = [];
     for (var i = 0; i < values.length; i += 1) {
-      var value = clean(values[i]);
+      var value = canonicalStatus(values[i]);
       var key = value.toLowerCase();
       if (!value || seen[key]) continue;
       seen[key] = true;
