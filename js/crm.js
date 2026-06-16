@@ -13,53 +13,13 @@ window.ConveneCRM = (() => {
     return org;
   }
 
-  function csvToRows(text) {
-    const rows = [];
-    let row = [], value = '', quoted = false;
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const next = text[i + 1];
-      if (char === '"' && quoted && next === '"') { value += '"'; i++; continue; }
-      if (char === '"') { quoted = !quoted; continue; }
-      if (char === ',' && !quoted) { row.push(value.trim()); value = ''; continue; }
-      if ((char === '\n' || char === '\r') && !quoted) {
-        if (char === '\r' && next === '\n') i++;
-        row.push(value.trim());
-        if (row.some(cell => cell !== '')) rows.push(row);
-        row = []; value = '';
-        continue;
-      }
-      value += char;
-    }
-    row.push(value.trim());
-    if (row.some(cell => cell !== '')) rows.push(row);
-    return rows;
-  }
-
   function parseCsv(text) {
-    const rows = csvToRows(text);
-    if (rows.length < 2) return [];
-    const headers = rows[0].map(h => h.toLowerCase().trim());
-    return rows.slice(1).map(row => {
-      const record = {};
-      headers.forEach((header, index) => {
-        const mapped = headerMap(header);
-        if (mapped) record[mapped] = row[index] || '';
-      });
-      return normalizeOrg(record);
-    }).filter(org => org.name);
-  }
+    if (window.ConveneBulkCsvImporter?.parseOrganizations) {
+      return window.ConveneBulkCsvImporter.parseOrganizations(text).map(normalizeOrg).filter(org => org.name);
+    }
 
-  function headerMap(header) {
-    const map = {
-      organization: 'name', org: 'name', name: 'name',
-      category: 'type', service_type: 'type', type: 'type',
-      status: 'status', reach: 'reach', confidence: 'confidence',
-      phone: 'phone', website: 'website', url: 'website', email: 'email',
-      address: 'address', latitude: 'lat', lat: 'lat', longitude: 'lng', lng: 'lng', lon: 'lng', long: 'lng',
-      focus: 'focus', tags: 'focus', mission: 'mission', description: 'mission', notes: 'notes'
-    };
-    return map[header] || null;
+    console.warn('CONVENE CSV import is handled by js/bulk-csv-import-aliases.js. Legacy simple parser fallback is disabled.');
+    return [];
   }
 
   return { fields, normalizeOrg, parseCsv };

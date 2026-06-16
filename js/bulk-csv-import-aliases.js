@@ -8,6 +8,13 @@
     installed: false
   };
 
+  window.ConveneBulkCsvImporter = {
+    parseCsv: parseCsv,
+    parseOrganizations: parseOrganizations,
+    normalizeOrgRow: normalizeOrgRow,
+    buildPreview: buildPreview
+  };
+
   function boot() {
     install();
     setTimeout(install, 250);
@@ -46,9 +53,7 @@
     event.stopImmediatePropagation();
 
     readText(file, function (text) {
-      state.rows = parseCsv(text).map(normalizeOrgRow).filter(function (row) {
-        return clean(row.name) || clean(row.id);
-      });
+      state.rows = parseOrganizations(text);
       renderPreview();
     });
   }
@@ -140,6 +145,12 @@
     var container = document.getElementById('bulkUpdatePreview');
     if (container) container.innerHTML = '<p>' + preview.updateCount + ' records updated and ' + preview.appendCount + ' records appended for ' + escapeHtml(county.name || county.id || 'this county') + '. Refreshing the workspace...</p>';
     setTimeout(function () { window.location.reload(); }, 650);
+  }
+
+  function parseOrganizations(text) {
+    return parseCsv(text).map(normalizeOrgRow).filter(function (row) {
+      return clean(row.name) || clean(row.id);
+    });
   }
 
   function normalizeOrgRow(row) {
