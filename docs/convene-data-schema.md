@@ -19,6 +19,16 @@ The core storage module currently treats these as the official workspace stores:
 3. activities
 4. relationships
 
+Phase 2A decision: coalitions are needed and should become an official CONVENE data store in Phase 2B.
+
+The future official workspace stores should be:
+
+1. organizations
+2. contacts
+3. activities
+4. relationships
+5. coalitions
+
 Each county uses its own localStorage namespace. The storage key pattern is:
 
 ```text
@@ -30,6 +40,8 @@ Example:
 ```text
 convene:fdl:organizations
 convene:waupaca:organizations
+convene:fdl:coalitions
+convene:waupaca:coalitions
 ```
 
 This separation is central to preventing Fond du Lac data from leaking into Waupaca or future counties.
@@ -166,36 +178,60 @@ Legacy or helper aliases:
 | targetOrgId | toOrgId |
 | label | Export helper field, not currently core form field |
 
-## Coalitions ambiguity
+## Coalition schema
 
-Coalitions are the main unresolved schema issue found in Phase 2A.
+Phase 2A decision: coalitions are needed and should become an official active CONVENE data type.
 
-Core storage does not currently list coalitions as an official store. The official core stores are organizations, contacts, activities, and relationships.
+The current app has partial coalition support through backup/export helper logic, but coalitions are not yet included in the core storage store list. Phase 2B should promote coalitions from partial helper behavior into the official storage, backup, restore, export, and UI model.
 
-However, `js/backup-export-tools.js` still references coalitions in JSON backup/export logic and offers a coalitions CSV export path.
+Recommended coalition fields:
 
-This creates a confusing contract:
+| Field | Purpose | Required |
+|---|---|---|
+| id | Internal coalition id | Auto-generated |
+| name | Coalition name | Yes |
+| status | Active, emerging, inactive, paused, or historical | Recommended |
+| type | Coalition type or issue area | Recommended |
+| focus | Focus areas or tags | Recommended |
+| organizationIds | Member or participating organization ids | Recommended |
+| leadOrganizationId | Lead or backbone organization id | Optional |
+| contactIds | Linked contact ids | Optional |
+| geographicScope | Countywide, municipal, neighborhood, regional, or multi-county | Recommended |
+| meetingCadence | Monthly, quarterly, ad hoc, etc. | Optional |
+| lastMetDate | Last known meeting date | Optional |
+| nextMeetingDate | Next known meeting date | Optional |
+| description | Plain-language coalition description | Recommended |
+| notes | Internal notes | Optional |
 
-- Core storage does not officially save coalitions.
-- The backup/export helper implies coalitions may exist.
-- The UI may imply support for a data area that is not fully active.
+Recommended coalition aliases for import/export compatibility:
 
-Phase 2B should make one clear decision:
+| Alias | Current field |
+|---|---|
+| tags | focus |
+| organizationNames | Derived from organizationIds during export |
+| memberOrganizationIds | organizationIds |
+| members | organizationIds or organization names, depending on import context |
+| leadOrgId | leadOrganizationId |
+| scope | geographicScope |
 
-Option A: make coalitions real official data.
+## Coalitions implementation decision
 
-- Add `coalitions` to the official storage store list.
-- Add restore support.
-- Add a clear UI path if coalitions should be editable.
-- Add documentation for coalition fields.
+Coalitions were the main unresolved schema issue found in Phase 2A. That decision is now resolved:
 
-Option B: treat coalitions as legacy-only.
+Coalitions should be official active data.
 
-- Remove or hide coalition export buttons/references.
-- Keep legacy read support only if needed for old backups.
-- Do not advertise coalitions as an active data type.
+That means Phase 2B should not hide coalition export references. Instead, it should make coalition handling honest and complete.
 
-Recommendation: choose Option B unless coalitions are needed soon. The current active app already has organizations, contacts, activities, relationships, map, reports, backup, CSV import, and Census Gap Lens. Adding another official store should not happen casually.
+Phase 2B should:
+
+1. Add `coalitions` to the official storage store list.
+2. Add coalitions to backup/export/restore as a first-class store.
+3. Preserve backwards compatibility with any existing localStorage `coalitions` data.
+4. Add or preserve CSV export for coalitions.
+5. Add a simple coalition UI only after storage/export/restore are stable.
+6. Document whether coalitions are linked to organizations only, or to both organizations and contacts.
+
+Implementation caution: coalitions should not be jammed into relationships. Relationships describe direct org-to-org ties. Coalitions are a separate convening structure with members, status, cadence, scope, and notes.
 
 ## Required field recommendations
 
@@ -249,6 +285,20 @@ Strongly recommended:
 - strength
 - status
 
+### Coalitions
+
+Required:
+
+- name
+
+Strongly recommended:
+
+- status
+- type or focus
+- geographicScope
+- organizationIds when known
+- description
+
 ## Storage hardening needs
 
 The current storage system already catches JSON parse errors during reads. However, Phase 2B should add safer handling for:
@@ -259,10 +309,11 @@ The current storage system already catches JSON parse errors during reads. Howev
 - backups with unknown stores
 - backups from another county
 - restore attempts that would overwrite active county data
+- partial restores where some stores are valid and others are invalid
 
 ## Upload-ready CSV organization headers
 
-The official upload-ready CSV should prefer these headers:
+The official upload-ready organization CSV should prefer these headers:
 
 ```text
 Organization Name
@@ -290,14 +341,36 @@ Notes
 
 The importer should continue accepting common aliases such as `name`, `organization`, `service type`, `physical address`, `lat`, `lng`, `description`, and `tags`.
 
+## Upload-ready CSV coalition headers
+
+A future upload-ready coalition CSV should prefer these headers:
+
+```text
+Coalition Name
+Status
+Type
+Focus Areas / Tags
+Geographic Scope
+Lead Organization
+Member Organizations
+Meeting Cadence
+Last Met Date
+Next Meeting Date
+Description
+Notes
+```
+
+Phase 2B does not need to build coalition CSV import immediately, but it should avoid designing storage in a way that blocks it.
+
 ## Phase 2B recommended work
 
-1. Decide the coalitions question.
-2. Update export/backup behavior to match that decision.
+1. Promote `coalitions` to an official store in `js/storage.js`.
+2. Update backup restore/export behavior so coalitions are included consistently.
 3. Add safer save handling in `js/storage.js`.
 4. Add backup validation before restore.
 5. Add a small user-facing warning when storage save fails.
 6. Keep behavior unchanged for organizations, contacts, activities, relationships, map, reports, backup, and CSV import.
+7. Add coalition UI only after storage and backup behavior are stable.
 
 ## Phase 2A status
 
