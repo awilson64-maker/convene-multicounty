@@ -17,7 +17,6 @@
     ['js/reports-v2.js', 'data-convene-reports', '__conveneReportsV2Loaded'],
     ['js/reports-standard-router.js', 'data-convene-reports-standard-router', '__conveneReportsStandardRouterLoaded'],
     ['js/reports-filter-repair.js', 'data-convene-reports-filter-repair', '__conveneReportsFilterRepairLoaded'],
-    ['js/reports-gap-action-priority.js', 'data-convene-gap-action-priority', '__conveneGapActionPriorityLoaded'],
     ['js/reports-gap-sort-fix.js', 'data-convene-gap-sort-fix', '__conveneGapSortFixLoaded'],
     ['js/reports-chart-sort.js', 'data-convene-reports-chart-sort', '__conveneReportsChartSortLoaded'],
     ['js/reports-need-layer.js', 'data-convene-reports-need-layer', '__conveneReportsNeedLayerLoaded']
