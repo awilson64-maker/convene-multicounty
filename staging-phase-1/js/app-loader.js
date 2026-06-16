@@ -21,7 +21,7 @@
   }
 
   function loadStartupSplashHelper() {
-    loadScriptOnce('../js/startup-splash.js', 'data-convene-startup-splash', '__conveneStartupSplashLoaded');
+    loadScriptOnce('js/startup-splash.js', 'data-convene-startup-splash', '__conveneStartupSplashLoaded');
   }
 
   function loadStartHereHelper() {
