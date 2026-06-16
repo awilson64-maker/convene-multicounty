@@ -221,7 +221,7 @@
       contacts: ['id', 'name', 'organizationId', 'organizationName', 'role', 'title', 'email', 'phone', 'strength', 'notes'],
       activities: ['id', 'date', 'type', 'organizationIds', 'organizationNames', 'contactIds', 'contactNames', 'summary', 'nextStep', 'followUpDate', 'followUpCompleted', 'notes'],
       relationships: ['id', 'fromOrgId', 'sourceOrgId', 'fromOrgName', 'toOrgId', 'targetOrgId', 'toOrgName', 'label', 'strength', 'status', 'summary', 'notes'],
-      coalitions: ['id', 'name', 'status', 'tags', 'organizationIds', 'organizationNames', 'description']
+      coalitions: ['id', 'name', 'status', 'type', 'focus', 'geographicScope', 'meetingCadence', 'lastMetDate', 'nextMeetingDate', 'leadOrganizationId', 'leadOrganizationName', 'organizationIds', 'organizationNames', 'contactIds', 'contactNames', 'description', 'notes', 'tags']
     };
     var base = defaults[storeName] || [];
     var extra = [];
@@ -248,6 +248,7 @@
     if (column === 'organizationName') return nameById(row.organizationId, data.organizations || []);
     if (column === 'organizationNames') return namesFromIds(row.organizationIds || row.orgIds || row.organizations, data.organizations || []);
     if (column === 'contactNames') return namesFromIds(row.contactIds || row.contacts, data.contacts || []);
+    if (column === 'leadOrganizationName') return nameById(row.leadOrganizationId || row.leadOrgId, data.organizations || []);
     if (column === 'fromOrgName') return nameById(row.fromOrgId || row.sourceOrgId, data.organizations || []);
     if (column === 'toOrgName') return nameById(row.toOrgId || row.targetOrgId, data.organizations || []);
     if (column === 'organizationIds' && Array.isArray(row.organizationIds)) return row.organizationIds.join('; ');
