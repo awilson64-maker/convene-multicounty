@@ -115,7 +115,7 @@
       } else {
         body = `
           ${metricSection([['Relevant orgs', orgs.length], ['Mapped matching assets', mappedAssets.length], ['Census tracts', all.length], ['Priority tracts shown', tracts.length], ['No nearby matching assets', tracts.filter(t => t.assetCount === 0).length], ['Activities', activities.length]])}
-          ${section('Geographic access readout', `<p>This report compares tract-level need signals with mapped assets matching <b>${escapeHtml(settings.focusTag || settings.serviceType)}</b>. The selected Census need layer is <b>${escapeHtml(metric.label)}</b>. The final gap priority now combines <b>relative need</b> with an <b>access gap score</b>, so nearby matching assets reduce the final priority.</p>`)}
+          ${section('Geographic access readout', `<p>This report compares tract-level need signals with mapped assets matching <b>${escapeHtml(settings.focusTag || settings.serviceType)}</b>. The selected Census need layer is <b>${escapeHtml(metric.label)}</b>. The final gap priority uses <b>relative need multiplied by access gap</b>, so nearby matching assets can push a tract down even when need is high.</p>`)}
           ${section('Priority tract table', tractTable(tracts, selectedMetric))}
           ${checked('reportCharts') ? section('Gap visuals', `<div class="chart-grid">${barChart('Final gap priority', tracts.map(t => [t.name, t.priority]), 12)}${barChart('Access gap score', tracts.map(t => [t.name, t.accessGap]), 12)}</div>`) : ''}
           ${checked('reportOrgList') ? orgTable(mappedAssets, 'Mapped organizations used as matching assets') : ''}
@@ -130,7 +130,7 @@
           <span class="report-chip">${escapeHtml(scopeLabel(settings))}</span>
         </header>
         ${body}
-        <footer class="report-section"><p class="muted small">Generated from the active county workspace. The service/focus selection defines matching assets. The need layer defines the Census signal. Final gap priority is weighted 60% relative need and 40% access gap.</p></footer>
+        <footer class="report-section"><p class="muted small">Generated from the active county workspace. The service/focus selection defines matching assets. The need layer defines the Census signal. Final gap priority is an interaction score: relative need x access gap. High-need tracts with very close matching assets are treated as capacity or coordination questions, not top geographic gaps.</p></footer>
       </article>`;
       output.innerHTML = state.lastGapHtml;
     } catch (err) {
@@ -267,7 +267,7 @@
       const assetCount = nearby.length;
       const closest = distances[0] || null;
       const accessGap = accessGapScore(closest?.miles, assetCount);
-      const priority = Math.max(0, Math.min(100, Math.round((tract.needScore * 0.6) + (accessGap * 0.4))));
+      const priority = Math.max(0, Math.min(100, Math.round((tract.needScore * accessGap) / 100)));
       return { ...tract, assetCount, closest, accessGap, accessSignal: accessSignal(closest?.miles, assetCount), priority };
     }).sort((a, b) => b.priority - a.priority || b.accessGap - a.accessGap || b.needScore - a.needScore);
   }
@@ -276,7 +276,7 @@
     if (!Number.isFinite(Number(closestMiles))) return 100;
     const d = Number(closestMiles);
     let score;
-    if (d <= 1) score = 8;
+    if (d <= 1) score = 0;
     else if (d <= 2) score = 18;
     else if (d <= 5) score = 40;
     else if (d <= 10) score = 65;
