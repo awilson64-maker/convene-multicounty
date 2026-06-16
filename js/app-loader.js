@@ -13,6 +13,7 @@
     ['js/org-list-controls.js', 'data-convene-org-list-controls', '__conveneOrgListControlsLoaded'],
     ['js/backup-export-tools.js', 'data-convene-backup-export-tools', '__conveneBackupExportToolsLoaded'],
     ['js/bulk-csv-import-aliases.js', 'data-convene-bulk-csv-import-aliases', '__conveneBulkCsvImportAliasesLoaded'],
+    ['js/coalitions-ui.js', 'data-convene-coalitions-ui', '__conveneCoalitionsUiLoaded'],
     ['js/reports-v2.js', 'data-convene-reports', '__conveneReportsV2Loaded'],
     ['js/reports-standard-router.js', 'data-convene-reports-standard-router', '__conveneReportsStandardRouterLoaded'],
     ['js/reports-filter-repair.js', 'data-convene-reports-filter-repair', '__conveneReportsFilterRepairLoaded'],
