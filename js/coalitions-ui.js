@@ -72,7 +72,7 @@
         '<input type="hidden" id="coalitionId" />' +
         '<div class="form-grid">' +
           '<label>Name<input id="coalitionName" required /></label>' +
-          '<label>Status><select id="coalitionStatus"><option>Active</option><option>Emerging</option><option>Paused</option><option>Inactive</option><option>Historical</option></select></label>' +
+          '<label>Status<select id="coalitionStatus"><option>Active</option><option>Emerging</option><option>Paused</option><option>Inactive</option><option>Historical</option></select></label>' +
           '<label>Type / Issue Area<input id="coalitionType" placeholder="Housing, food security, youth, etc." /></label>' +
           '<label>Geographic Scope<select id="coalitionGeographicScope"><option>Countywide</option><option>Municipal</option><option>Neighborhood</option><option>Regional</option><option>Multi-county</option><option>Unknown</option></select></label>' +
           '<label class="full">Focus / Tags<input id="coalitionFocus" /></label>' +
