@@ -1,5 +1,6 @@
 window.ConveneStorage = (() => {
-  const STORES = ['organizations', 'contacts', 'activities', 'relationships'];
+  const STORES = ['organizations', 'contacts', 'activities', 'relationships', 'coalitions'];
+  let restoreCoalitions = null;
 
   function key(county, name) {
     return `${county.storagePrefix}:${name}`;
@@ -24,11 +25,21 @@ window.ConveneStorage = (() => {
     return workspace;
   }
 
-  function saveWorkspace(county, workspace) {
-    STORES.forEach(store => saveStore(county, store, workspace[store] || []));
+  function saveWorkspace(county, workspace = {}) {
+    STORES.forEach(store => saveStore(county, store, storeRecords(county, workspace, store)));
   }
 
-  function exportBackup(county, workspace) {
+  function storeRecords(county, workspace, store) {
+    if (Object.prototype.hasOwnProperty.call(workspace, store)) return workspace[store] || [];
+    if (store === 'coalitions' && restoreCoalitions !== null) {
+      const rows = restoreCoalitions;
+      restoreCoalitions = null;
+      return rows;
+    }
+    return loadStore(county, store);
+  }
+
+  function exportBackup(county, workspace = {}) {
     return {
       system: 'CONVENE',
       edition: 'multi-county',
@@ -36,19 +47,23 @@ window.ConveneStorage = (() => {
       countyName: county.name,
       exportDate: new Date().toISOString(),
       stores: STORES,
-      organizations: workspace.organizations || [],
-      contacts: workspace.contacts || [],
-      activities: workspace.activities || [],
-      relationships: workspace.relationships || []
+      organizations: storeRecords(county, workspace, 'organizations'),
+      contacts: storeRecords(county, workspace, 'contacts'),
+      activities: storeRecords(county, workspace, 'activities'),
+      relationships: storeRecords(county, workspace, 'relationships'),
+      coalitions: storeRecords(county, workspace, 'coalitions')
     };
   }
 
-  function workspaceFromBackup(data) {
+  function workspaceFromBackup(data = {}) {
+    const coalitions = Array.isArray(data.coalitions) ? data.coalitions : [];
+    if (Array.isArray(data.coalitions)) restoreCoalitions = coalitions;
     return {
       organizations: Array.isArray(data.organizations) ? data.organizations : [],
       contacts: Array.isArray(data.contacts) ? data.contacts : [],
       activities: Array.isArray(data.activities) ? data.activities : [],
-      relationships: Array.isArray(data.relationships) ? data.relationships : []
+      relationships: Array.isArray(data.relationships) ? data.relationships : [],
+      coalitions
     };
   }
 
