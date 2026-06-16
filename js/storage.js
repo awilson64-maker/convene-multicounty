@@ -1,5 +1,6 @@
 window.ConveneStorage = (() => {
   const STORES = ['organizations', 'contacts', 'activities', 'relationships', 'coalitions'];
+  let restoreCoalitions = null;
 
   function key(county, name) {
     return `${county.storagePrefix}:${name}`;
@@ -30,6 +31,11 @@ window.ConveneStorage = (() => {
 
   function storeRecords(county, workspace, store) {
     if (Object.prototype.hasOwnProperty.call(workspace, store)) return workspace[store] || [];
+    if (store === 'coalitions' && restoreCoalitions !== null) {
+      const rows = restoreCoalitions;
+      restoreCoalitions = null;
+      return rows;
+    }
     return loadStore(county, store);
   }
 
@@ -49,13 +55,15 @@ window.ConveneStorage = (() => {
     };
   }
 
-  function workspaceFromBackup(data) {
+  function workspaceFromBackup(data = {}) {
+    const coalitions = Array.isArray(data.coalitions) ? data.coalitions : [];
+    if (Array.isArray(data.coalitions)) restoreCoalitions = coalitions;
     return {
       organizations: Array.isArray(data.organizations) ? data.organizations : [],
       contacts: Array.isArray(data.contacts) ? data.contacts : [],
       activities: Array.isArray(data.activities) ? data.activities : [],
       relationships: Array.isArray(data.relationships) ? data.relationships : [],
-      coalitions: Array.isArray(data.coalitions) ? data.coalitions : []
+      coalitions
     };
   }
 
