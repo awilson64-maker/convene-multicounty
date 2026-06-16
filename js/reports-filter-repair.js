@@ -37,10 +37,11 @@
     var organizations = loadActiveOrganizations();
     if (!organizations.length) return;
 
-    if (serviceSelect && serviceSelect.options.length <= 1) {
-      setSelectOptions(serviceSelect, unique(organizations.map(getOrgType)), 'All service types');
+    if (serviceSelect) {
+      var serviceTypes = unique(flatten([organizations.map(getOrgType), getTypeDropdownOptions(), getExistingOptions(serviceSelect)]));
+      setSelectOptions(serviceSelect, serviceTypes, 'All service types');
     }
-    if (focusSelect && focusSelect.options.length <= 1) {
+    if (focusSelect) {
       setSelectOptions(focusSelect, unique(flatten(organizations.map(getOrgFocusTags))), 'All focus tags');
     }
   }
@@ -112,6 +113,17 @@
     return String(raw || '').split(',').map(clean).filter(Boolean);
   }
 
+  function getTypeDropdownOptions() {
+    var select = document.getElementById('type');
+    if (!select || !select.options) return [];
+    return Array.prototype.slice.call(select.options).map(function (option) { return clean(option.value || option.textContent); }).filter(Boolean).filter(function (value) { return value !== 'Select type...'; });
+  }
+
+  function getExistingOptions(select) {
+    if (!select || !select.options) return [];
+    return Array.prototype.slice.call(select.options).map(function (option) { return clean(option.value || option.textContent); }).filter(Boolean).filter(function (value) { return value !== 'All service types'; });
+  }
+
   function setSelectOptions(select, values, blankLabel) {
     var current = select.value || '';
     var html = '<option value="">' + escapeHtml(blankLabel) + '</option>';
@@ -149,7 +161,7 @@
   }
 
   function clean(value) {
-    return String(value == null ? '' : value).trim();
+    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
   }
 
   function escapeHtml(value) {
